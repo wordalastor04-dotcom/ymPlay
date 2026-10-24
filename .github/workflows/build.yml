@@ -23,12 +23,22 @@ jobs:
         run: |
           sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/><\/manifest>/' android/app/src/main/AndroidManifest.xml
           
+      - name: Decodificar Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.p12
+          
       - name: Sincronizar Capacitor
         run: npx cap sync
         
-      - name: Compilar APK
-        run: cd android && ./gradlew assembleDebug
-        
+      - name: Compilar APK Firmado
+        run: |
+          cd android
+          ./gradlew assembleDebug \
+          -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/release.p12 \
+          -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
