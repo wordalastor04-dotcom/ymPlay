@@ -7,14 +7,7 @@ let currentIndex = -1;
 let isPlaying = false;
 let lyricsData = [];
 
-// Detectar si estamos en la app Android (Capacitor)
-const isCapacitor = window.Capacitor !== undefined;
-let MediaStore = null;
-if (isCapacitor) {
-  MediaStore = window.Capacitor.Plugins.MediaStore;
-}
-
-// Web Audio API para ecualizador
+// Variables para el ecualizador
 let audioCtx = null;
 let sourceNode = null;
 let eqFilters = [];
@@ -51,21 +44,35 @@ const backToListBtn = $('backToListBtn');
 const lyricsBox = $('lyricsBox');
 
 // ============================================================
-// 3. ESCANEO NATIVO DE MÚSICA (MediaStore)
+// 3. ESCANEO NATIVO DE MÚSICA (CORREGIDO)
 // ============================================================
 async function escanearMusicaNativa() {
-  if (!isCapacitor || !MediaStore) {
-    console.warn("MediaStore no disponible. Estás en el navegador web.");
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo automático solo disponible en el APK.</li>';
+  // Buscar el plugin con el nombre correcto (CapacitorMediaStore)
+  const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
+
+  if (!window.Capacitor || !MediaStorePlugin) {
+    console.warn("MediaStore no disponible. Estás en el navegador web o el plugin no se cargó.");
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo automático solo disponible en el APK. Asegúrate de haber instalado la versión compilada.</li>';
     return;
   }
 
   try {
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Solicitando permisos...</li>';
     
-    // Pedir audios al sistema Android
-    const result = await MediaStore.getMedias({ mediaType: 'audio' });
-    const listaAudios = result.medias || result.files || result.audios || [];
+    // Solicitar permisos explícitamente para archivos de audio
+    await MediaStorePlugin.requestPermissions({ types: ['audio'] });
+
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+
+    // Obtener la lista usando el método correcto
+    const result = await MediaStorePlugin.getMediasByType({ 
+      mediaType: 'audio',
+      sortBy: 'TITLE',
+      includeExternal: true
+    });
+
+    // El plugin devuelve los archivos en result.media
+    const listaAudios = result.media || result.medias || [];
 
     if (listaAudios.length > 0) {
       tracks = listaAudios.map(song => {
@@ -79,11 +86,11 @@ async function escanearMusicaNativa() {
       
       renderPlaylist();
     } else {
-      playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
+      playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música en el teléfono.</li>';
     }
   } catch (error) {
     console.error("Error al escanear:", error);
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa permisos.</li>';
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos en Ajustes.</li>';
   }
 }
 
@@ -94,7 +101,7 @@ function renderPlaylist() {
   if (trackCount) trackCount.textContent = `${tracks.length} pista${tracks.length !== 1 ? 's' : ''}`;
   
   if (tracks.length === 0) {
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Añade música para empezar</li>';
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música para mostrar</li>';
     return;
   }
 
@@ -110,7 +117,7 @@ function renderPlaylist() {
     </li>
   `).join('');
 
-  // Al tocar una canción, se carga y se abre el reproductor
+  // Evento al tocar una canción
   playlistEl.querySelectorAll('li').forEach(li => {
     li.addEventListener('click', () => {
       const idx = parseInt(li.dataset.index);
@@ -128,8 +135,7 @@ function abrirReproductor() {
 function volverALista() {
   if(screenPlayer) screenPlayer.style.display = 'none';
   if(screenPlaylist) screenPlaylist.style.display = 'flex';
-  // Refrescar la lista por si cambió la canción activa
-  renderPlaylist();
+  renderPlaylist(); // Refrescar la lista por si cambió la canción activa
 }
 
 // ============================================================
@@ -141,15 +147,15 @@ function cargarCancion(index) {
   const track = tracks[index];
 
   audio.src = track.url;
-  songTitle.textContent = track.name;
-  songArtist.textContent = track.artist;
+  if(songTitle) songTitle.textContent = track.name;
+  if(songArtist) songArtist.textContent = track.artist;
   
   if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
 
-  if (track.cover) {
+  if (track.cover && coverImg) {
     coverImg.src = track.cover;
     coverImg.style.display = 'block';
-  } else {
+  } else if (coverImg) {
     coverImg.style.display = 'none';
   }
 
@@ -302,7 +308,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ============================================================
-// 9. TEMAS Y FONDO (Opcional)
+// 9. TEMAS Y FONDO
 // ============================================================
 document.querySelectorAll('.palette-dot').forEach(dot => {
   dot.addEventListener('click', () => {
@@ -333,17 +339,17 @@ if(prevBtn) prevBtn.addEventListener('click', prevTrack);
 if(nextBtn) nextBtn.addEventListener('click', nextTrack);
 if(backToListBtn) backToListBtn.addEventListener('click', volverALista);
 
-// Botón de "Actualizar Música" en la lista
+// Botón de "Actualizar Música"
 if(btnEscanear) {
   btnEscanear.addEventListener('click', (e) => {
-    e.preventDefault(); // Evita que se abra el input file
+    e.preventDefault(); 
     escanearMusicaNativa();
   });
 }
 
-// Arrancar la app
+// Arrancar la app automáticamente
 document.addEventListener('DOMContentLoaded', () => {
-  // Esperar 1.5 segundos para que cargue la UI y Android pida los permisos
+  // Esperar 1.5 segundos para que la UI cargue y Android muestre los permisos
   setTimeout(() => {
     escanearMusicaNativa();
   }, 1500);
