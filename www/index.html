@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ymPlay</title>
   
+  <!-- ENLACE AL CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,6 +27,7 @@
       <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
     </ul>
   </div>
+  <!-- Capa oscura detrás del menú -->
   <div id="menu-overlay" class="menu-overlay"></div>
 
   <div class="player-app">
@@ -33,9 +35,9 @@
     <!-- PANTALLA 1: LISTA DE MÚSICA -->
     <div id="screen-playlist" style="display: flex; flex-direction: column; height: 100%;">
       
+      <!-- BARRA SUPERIOR CON MENÚ HAMBURGUESA -->
       <div class="top-bar">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <!-- BOTÓN HAMBURGUESA -->
           <button class="icon-btn" id="menuBtn">
             <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
           </button>
@@ -48,6 +50,7 @@
         </div>
       </div>
 
+      <!-- SELECTOR DE PALETA -->
       <div class="palette-switcher">
         <div class="palette-dot active" data-color="ocean" title="Océano"></div>
         <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
@@ -55,15 +58,19 @@
         <div class="palette-dot" data-color="mono" title="Monocromo"></div>
       </div>
 
+      <!-- LISTA DE REPRODUCCIÓN -->
       <div class="playlist-section" style="flex: 1; overflow-y: auto;">
-        <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
-        <ul class="playlist" id="playlist"></ul>
+        <h3 style="padding: 0 10px;">Canciones en tu teléfono <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
+        <ul class="playlist" id="playlist">
+          <li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>
+        </ul>
       </div>
 
+      <!-- ACCIONES INFERIORES -->
       <div class="bottom-actions" style="margin-top: auto; padding-top: 10px;">
         <label class="file-label" id="btnEscanear">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>
-          Actualizar
+          Actualizar Música
         </label>
         <label class="bg-label">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4z"/></svg>
