@@ -23,15 +23,13 @@ jobs:
         run: |
           sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/><\/manifest>/' android/app/src/main/AndroidManifest.xml
           
-      - name: Decodificar Keystore (Ruta corregida)
+      - name: Decodificar Keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
           
-      - name: Configurar Firma en build.gradle (Ruta corregida)
+      - name: Configurar Firma en build.gradle
         run: |
-          # Inyecta la configuración apuntando a la ruta correcta (android/release.p12)
-          sed -i 's/buildTypes {/signingConfigs {\n        release {\n            storeFile file("..\/release.p12")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n    buildTypes {/' android/app/build.gradle
-          # Fuerza al modo Debug a usar esta firma
+          sed -i 's/buildTypes {/signingConfigs {\n        release {\n            storeFile file("..\/release.p12")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n            storeType "PKCS12"\n        }\n    }\n    buildTypes {/' android/app/build.gradle
           sed -i 's/buildTypes {/buildTypes {\n        debug {\n            signingConfig signingConfigs.release\n        }/' android/app/build.gradle
           
       - name: Sincronizar Capacitor
