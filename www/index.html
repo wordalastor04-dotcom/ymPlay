@@ -8,16 +8,17 @@
 </head>
 <body>
 
+  <!-- Fondo personalizado -->
   <div id="custom-bg"></div>
 
-  <!-- BANNER DE ACTUALIZACIÓN (Oculto por defecto) -->
+  <!-- BANNER DE ACTUALIZACIÓN (Oculto por defecto, aparece con el JS) -->
   <div id="update-banner" class="update-banner">
     <span>✨ ¡Nueva actualización disponible!</span>
     <button id="downloadUpdateBtn">Descargar</button>
     <button id="closeUpdateBtn" class="close-update">✕</button>
   </div>
 
-  <!-- MENÚ LATERAL -->
+  <!-- MENÚ LATERAL (3 RAYAS) -->
   <div id="side-menu" class="side-menu">
     <div class="menu-header">
       <h2>Opciones</h2>
@@ -30,6 +31,7 @@
       <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
       <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
       
+      <!-- Botón de Fondo dentro del menú -->
       <li>
         <label class="menu-btn" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
           🖼️ Cambiar Fondo
@@ -38,6 +40,7 @@
       </li>
     </ul>
     
+    <!-- Control de desenfoque -->
     <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
       <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">
         Desenfoque de fondo:
@@ -49,9 +52,12 @@
 
   <div class="player-app">
     
-    <!-- PANTALLA 1: LISTA -->
+    <!-- ========================================== -->
+    <!-- PANTALLA 1: LISTA DE MÚSICA                -->
+    <!-- ========================================== -->
     <div id="screen-playlist" style="display: flex; flex-direction: column; height: 100%;">
       
+      <!-- BARRA SUPERIOR -->
       <div class="top-bar">
         <div style="display: flex; align-items: center; gap: 10px;">
           <button class="icon-btn" id="menuBtn">
@@ -66,6 +72,7 @@
         </div>
       </div>
 
+      <!-- SELECTOR DE PALETA -->
       <div class="palette-switcher">
         <div class="palette-dot active" data-color="ocean" title="Océano"></div>
         <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
@@ -73,17 +80,20 @@
         <div class="palette-dot" data-color="mono" title="Monocromo"></div>
       </div>
 
+      <!-- BOTÓN ACTUALIZAR MÚSICA (Pequeño y centrado) -->
       <div style="display: flex; justify-content: center; margin-bottom: 15px;">
         <button id="btnEscanear" class="small-update-btn">
           Actualizar Música
         </button>
       </div>
 
+      <!-- LISTA DE CANCIONES -->
       <div class="playlist-section" style="flex: 1; overflow-y: auto;">
         <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
         <ul class="playlist" id="playlist"></ul>
       </div>
 
+      <!-- MINI REPRODUCTOR (Oculto hasta que se elige una canción) -->
       <div id="mini-player" class="mini-player" style="display: none;">
         <img id="miniCover" src="" alt="Portada" class="mini-cover">
         <div class="mini-info" id="miniInfoBtn">
@@ -91,15 +101,22 @@
           <span id="miniArtist">Artista</span>
         </div>
         <div class="mini-controls">
-          <button id="miniPlayBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-          <button id="miniNextBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+          <button id="miniPlayBtn" class="mini-btn">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button id="miniNextBtn" class="mini-btn">
+            <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+          </button>
         </div>
       </div>
 
     </div>
 
-    <!-- PANTALLA 2: REPRODUCTOR COMPLETO -->
+    <!-- ========================================== -->
+    <!-- PANTALLA 2: REPRODUCTOR COMPLETO           -->
+    <!-- ========================================== -->
     <div id="screen-player" style="display: none; flex-direction: column; height: 100%;">
+      
       <div class="top-bar" style="justify-content: flex-start; margin-bottom: 10px;">
         <button class="icon-btn" id="backToListBtn" style="margin-right: 10px;">
           <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z"/></svg>
@@ -107,17 +124,20 @@
         <h1 style="font-size: 16px;">Reproduciendo</h1>
       </div>
 
+      <!-- PORTADA GRANDE -->
       <div class="cover-container">
         <div class="cover-placeholder">🎵</div>
         <img id="coverImg" src="" alt="Portada" style="display:none;" />
         <span class="cover-badge" id="coverBadge">Pista</span>
       </div>
 
+      <!-- INFORMACIÓN DE LA CANCIÓN -->
       <div class="song-info">
         <div class="song-title" id="songTitle">Selecciona una canción</div>
         <div class="song-artist" id="songArtist">—</div>
       </div>
 
+      <!-- BARRA DE PROGRESO -->
       <div class="progress-section">
         <div class="progress-bar-wrap" id="progressBar">
           <div class="progress-fill" id="progressFill"></div>
@@ -128,12 +148,14 @@
         </div>
       </div>
 
+      <!-- CONTROLES PRINCIPALES -->
       <div class="controls">
         <button class="ctrl-btn" id="prevBtn"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
         <button class="ctrl-btn play-btn" id="playBtn"><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
         <button class="ctrl-btn" id="nextBtn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
       </div>
 
+      <!-- PESTAÑAS (LETRAS / ECUALIZADOR) -->
       <div class="tab-bar" style="margin-top: 10px;">
         <button class="tab-btn active" data-tab="lyrics">Letras</button>
         <button class="tab-btn" data-tab="eq">Ecualizador</button>
@@ -161,9 +183,11 @@
           </div>
         </div>
       </div>
+      
     </div>
   </div>
 
+  <!-- ENLACE AL JAVASCRIPT -->
   <script src="script.js"></script>
 </body>
-            </html>
+</html>
