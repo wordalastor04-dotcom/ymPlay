@@ -9,7 +9,7 @@ let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 // ⚠️ IMPORTANTE: Cambia este número cuando compiles un nuevo APK
-const CURRENT_APP_VERSION = "1.0.0";
+const CURRENT_APP_VERSION = "1.0.0"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -56,12 +56,23 @@ const updateBanner = $('update-banner');
 const downloadUpdateBtn = $('downloadUpdateBtn');
 const closeUpdateBtn = $('closeUpdateBtn');
 
+// ============================================================
 // COMPROBAR ACTUALIZACIONES
+// ============================================================
 async function checkForUpdates() {
   try {
-    const response = await fetch(UPDATE_JSON_URL);
-    const data = await response.json();
-    if (data.version !== CURRENT_APP_VERSION) {
+    let data;
+    
+    // Usar CapacitorHttp para evitar el bloqueo de CORS en Android
+    if (window.Capacitor && window.Capacitor.Plugins.CapacitorHttp) {
+      const response = await window.Capacitor.Plugins.CapacitorHttp.get({ url: UPDATE_JSON_URL });
+      data = response.data; 
+    } else {
+      const response = await fetch(UPDATE_JSON_URL);
+      data = await response.json();
+    }
+
+    if (data && data.version !== CURRENT_APP_VERSION) {
       if (updateBanner) {
         downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
         updateBanner.classList.add('show');
@@ -76,7 +87,9 @@ if (closeUpdateBtn) {
   closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 }
 
-// ESCANEO CON FILTRO DE DURACIÓN (Mayor a 1 minuto)
+// ============================================================
+// ESCANEO DE MÚSICA
+// ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
@@ -98,21 +111,14 @@ async function escanearMusicaNativa() {
           url: song.url || song.uri || song.path,
           cover: song.albumArt || song.albumArtUri || song.cover || '',
           dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-          // Guardamos la duración que nos da Android (suele venir en milisegundos)
           duration: song.duration || song.durationMs || 0 
         };
       }).filter(t => {
-        // 1. Que tenga un enlace de audio válido
         if (!t.url) return false;
-        
-        // 2. Filtro de duración: Mayor o igual a 60,000 ms (1 minuto)
-        // Si la duración viene en segundos (por si acaso), multiplicamos por 1000
         let dur = t.duration;
         if (dur > 0 && dur < 1000) dur = dur * 1000; 
-        
-        return dur >= 60000; // 60000 ms = 1 minuto
+        return dur >= 60000; // Solo mayores a 1 min
       });
-      
       sortTracks('newest');
     } else {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
@@ -122,7 +128,9 @@ async function escanearMusicaNativa() {
   }
 }
 
-// LISTA
+// ============================================================
+// RENDERIZAR LISTA
+// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -153,7 +161,6 @@ function renderPlaylist() {
   });
 }
 
-// MENÚ Y ORDEN
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
   if (criteria === 'newest') tracks.sort((a, b) => b.dateAdded - a.dateAdded);
@@ -167,7 +174,9 @@ function sortTracks(criteria) {
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
+// ============================================================
 // REPRODUCTOR
+// ============================================================
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -324,7 +333,7 @@ if (miniNextBtn) miniNextBtn.addEventListener('click', (e) => { e.stopPropagatio
 if (miniInfoBtn) miniInfoBtn.addEventListener('click', abrirReproductor);
 if (miniCover) miniCover.addEventListener('click', abrirReproductor);
 
-// FONDO Y BLUR
+// LÓGICA DEL FONDO
 function applyBackground(imageSrc, blurAmount) {
   if (!customBg) return;
   customBg.style.backgroundImage = `url(${imageSrc})`;
@@ -344,9 +353,7 @@ if (bgInput) {
           localStorage.setItem('ymPlay_bgBlur', '0');
           if (bgBlurSlider) bgBlurSlider.value = 0;
           applyBackground(base64Image, 0);
-        } catch (err) {
-          alert("La imagen es muy grande para guardarla. Intenta con una más pequeña.");
-        }
+        } catch (err) { alert("La imagen es muy grande."); }
       };
       reader.readAsDataURL(file);
     }
@@ -378,7 +385,32 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
+// ============================================================
+// CONTROL DEL BOTÓN "ATRÁS" DE ANDROID
+// ============================================================
+function setupBackButton() {
+  const AppPlugin = window.Capacitor?.Plugins?.App;
+  if (AppPlugin) {
+    AppPlugin.addListener('backButton', () => {
+      // 1. Si el menú lateral está abierto, lo cerramos
+      if (sideMenu && sideMenu.classList.contains('open')) {
+        closeMenu();
+      } 
+      // 2. Si estamos en la pantalla del reproductor, volvemos a la lista
+      else if (screenPlayer && screenPlayer.style.display === 'flex') {
+        volverALista();
+      } 
+      // 3. Si ya estamos en la lista principal, cerramos la app
+      else {
+        AppPlugin.exitApp();
+      }
+    });
+  }
+}
+
+// ============================================================
 // ARRANQUE
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   const savedBg = localStorage.getItem('ymPlay_customBg');
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
@@ -389,4 +421,5 @@ document.addEventListener('DOMContentLoaded', () => {
   
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
   checkForUpdates();
+  setupBackButton();
 });
