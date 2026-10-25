@@ -8,7 +8,6 @@
 </head>
 <body>
 
-  <!-- Fondo personalizado -->
   <div id="custom-bg"></div>
 
   <!-- BANNER DE ACTUALIZACIÓN -->
@@ -18,7 +17,7 @@
     <button id="closeUpdateBtn" class="close-update">✕</button>
   </div>
 
-  <!-- MENÚ LATERAL (3 RAYAS) -->
+  <!-- MENÚ LATERAL -->
   <div id="side-menu" class="side-menu">
     <div class="menu-header">
       <h2>Opciones</h2>
@@ -30,8 +29,6 @@
       <li><button id="sortNewestBtn">⬇️ Más recientes primero</button></li>
       <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
       <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
-      
-      <!-- Botón de Fondo dentro del menú -->
       <li>
         <label class="menu-btn" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
           🖼️ Cambiar Fondo
@@ -39,12 +36,8 @@
         </label>
       </li>
     </ul>
-    
-    <!-- Control de desenfoque -->
     <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-      <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">
-        Desenfoque de fondo:
-      </label>
+      <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">Desenfoque de fondo:</label>
       <input type="range" id="bgBlurSlider" min="0" max="20" value="0" step="1" style="width: 100%; accent-color: var(--accent);">
     </div>
   </div>
@@ -52,12 +45,9 @@
 
   <div class="player-app">
     
-    <!-- ========================================== -->
-    <!-- PANTALLA 1: LISTA DE MÚSICA                -->
-    <!-- ========================================== -->
-    <div id="screen-playlist" style="display: flex; flex-direction: column; height: 100%;">
+    <!-- PANTALLA 1: LISTA PRINCIPAL -->
+    <div id="screen-main" style="display: flex; flex-direction: column; height: 100%;">
       
-      <!-- BARRA SUPERIOR -->
       <div class="top-bar">
         <div style="display: flex; align-items: center; gap: 10px;">
           <button class="icon-btn" id="menuBtn">
@@ -80,20 +70,32 @@
         <div class="palette-dot" data-color="mono" title="Monocromo"></div>
       </div>
 
-      <!-- BOTÓN ACTUALIZAR MÚSICA -->
-      <div style="display: flex; justify-content: center; margin-bottom: 15px;">
-        <button id="btnEscanear" class="small-update-btn">
-          Actualizar Música
+      <!-- PESTAÑAS (CANCIONES / PLAYLISTS) -->
+      <div class="tabs-container">
+        <button class="tab-btn-main active" data-view="songs">Canciones</button>
+        <button class="tab-btn-main" data-view="playlists">Playlists</button>
+      </div>
+
+      <!-- VISTA 1: TODAS LAS CANCIONES -->
+      <div id="view-songs" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="display: flex; justify-content: center; margin-bottom: 15px;">
+          <button id="btnEscanear" class="small-update-btn">Actualizar Música</button>
+        </div>
+        <div class="playlist-section" style="flex: 1; overflow-y: auto;">
+          <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
+          <ul class="playlist" id="playlist"></ul>
+        </div>
+      </div>
+
+      <!-- VISTA 2: MIS PLAYLISTS -->
+      <div id="view-playlists" style="flex: 1; display: none; flex-direction: column; overflow-y: auto;">
+        <button id="btnNewPlaylist" class="add-playlist-btn">
+          <span>+</span> Crear nueva Playlist
         </button>
+        <ul class="playlist" id="playlists-list" style="margin-top: 15px;"></ul>
       </div>
 
-      <!-- LISTA DE CANCIONES -->
-      <div class="playlist-section" style="flex: 1; overflow-y: auto;">
-        <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
-        <ul class="playlist" id="playlist"></ul>
-      </div>
-
-      <!-- MINI REPRODUCTOR (Oculto hasta que se elige una canción) -->
+      <!-- MINI REPRODUCTOR -->
       <div id="mini-player" class="mini-player" style="display: none;">
         <img id="miniCover" src="" alt="Portada" class="mini-cover">
         <div class="mini-info" id="miniInfoBtn">
@@ -101,22 +103,14 @@
           <span id="miniArtist">Artista</span>
         </div>
         <div class="mini-controls">
-          <button id="miniPlayBtn" class="mini-btn">
-            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          </button>
-          <button id="miniNextBtn" class="mini-btn">
-            <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
-          </button>
+          <button id="miniPlayBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+          <button id="miniNextBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
         </div>
       </div>
-
     </div>
 
-    <!-- ========================================== -->
-    <!-- PANTALLA 2: REPRODUCTOR COMPLETO           -->
-    <!-- ========================================== -->
+    <!-- PANTALLA 3: REPRODUCTOR COMPLETO -->
     <div id="screen-player" style="display: none; flex-direction: column; height: 100%;">
-      
       <div class="top-bar" style="justify-content: flex-start; margin-bottom: 10px;">
         <button class="icon-btn" id="backToListBtn" style="margin-right: 10px;">
           <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z"/></svg>
@@ -124,47 +118,33 @@
         <h1 style="font-size: 16px;">Reproduciendo</h1>
       </div>
 
-      <!-- PORTADA GRANDE -->
       <div class="cover-container">
         <div class="cover-placeholder">🎵</div>
         <img id="coverImg" src="" alt="Portada" style="display:none;" />
         <span class="cover-badge" id="coverBadge">Pista</span>
       </div>
 
-      <!-- INFORMACIÓN DE LA CANCIÓN -->
       <div class="song-info">
         <div class="song-title" id="songTitle">Selecciona una canción</div>
         <div class="song-artist" id="songArtist">—</div>
       </div>
 
-      <!-- BARRA DE PROGRESO -->
       <div class="progress-section">
-        <div class="progress-bar-wrap" id="progressBar">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <div class="time-labels">
-          <span id="currentTime">0:00</span>
-          <span id="totalTime">0:00</span>
-        </div>
+        <div class="progress-bar-wrap" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="time-labels"><span id="currentTime">0:00</span><span id="totalTime">0:00</span></div>
       </div>
 
-      <!-- CONTROLES PRINCIPALES -->
       <div class="controls">
         <button class="ctrl-btn" id="prevBtn"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
         <button class="ctrl-btn play-btn" id="playBtn"><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
         <button class="ctrl-btn" id="nextBtn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
       </div>
 
-      <!-- PESTAÑAS (LETRAS / ECUALIZADOR) -->
       <div class="tab-bar" style="margin-top: 10px;">
         <button class="tab-btn active" data-tab="lyrics">Letras</button>
         <button class="tab-btn" data-tab="eq">Ecualizador</button>
       </div>
-
-      <div class="tab-content active" id="tab-lyrics">
-        <div class="lyrics-box" id="lyricsBox"><p>Sin letras disponibles</p></div>
-      </div>
-
+      <div class="tab-content active" id="tab-lyrics"><div class="lyrics-box" id="lyricsBox"><p>Sin letras disponibles</p></div></div>
       <div class="tab-content" id="tab-eq">
         <div class="eq-container">
           <div class="eq-presets" id="eqPresets">
@@ -183,11 +163,32 @@
           </div>
         </div>
       </div>
-      
     </div>
   </div>
 
-  <!-- ENLACE AL JAVASCRIPT -->
+  <!-- MODAL PARA CREAR PLAYLIST -->
+  <div id="modal-new-playlist" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Nueva Playlist</h3>
+      <input type="text" id="newPlaylistName" placeholder="Nombre de la lista..." maxlength="30">
+      <div class="modal-actions">
+        <button id="cancelNewPlaylist" class="btn-secondary">Cancelar</button>
+        <button id="saveNewPlaylist" class="btn-primary">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA AÑADIR A PLAYLIST -->
+  <div id="modal-add-to-playlist" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Añadir a playlist</h3>
+      <ul id="playlist-options" class="playlist-options-list"></ul>
+      <div class="modal-actions">
+        <button id="cancelAddToPlaylist" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
-  </html>
+</html>
