@@ -1,6 +1,3 @@
-// ============================================================
-// 1. CONFIGURACIÓN E IMPORTACIÓN DEL PLUGIN NATIVO
-// ============================================================
 const audio = new Audio();
 audio.crossOrigin = "anonymous";
 let tracks = [];
@@ -11,9 +8,6 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-// ============================================================
-// 2. REFERENCIAS DOM
-// ============================================================
 const $ = id => document.getElementById(id);
 const screenPlaylist = $('screen-playlist');
 const screenPlayer = $('screen-player');
@@ -34,6 +28,7 @@ const coverImg = $('coverImg');
 const coverBadge = $('coverBadge');
 const backToListBtn = $('backToListBtn');
 const bgInput = $('bgInput');
+const bgBlurSlider = $('bgBlurSlider'); // Nuevo control
 
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
@@ -43,67 +38,43 @@ const sortNewestBtn = $('sortNewestBtn');
 const sortOldestBtn = $('sortOldestBtn');
 const sortTitleBtn = $('sortTitleBtn');
 
-// ============================================================
-// 3. ESCANEO NATIVO DE MÚSICA
-// ============================================================
+// ESCANEO
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
-  
   if (!window.Capacitor || !MediaStorePlugin) {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">El escaneo solo funciona en el APK, no en el navegador.</li>';
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
     return;
   }
-
   try {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Pidiendo permisos...</li>';
-    
-    // Pedir permisos de audio
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
-    
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música en el teléfono...</li>';
-
-    // Obtener archivos
-    const result = await MediaStorePlugin.getMediasByType({ 
-      mediaType: 'audio', 
-      sortBy: 'TITLE', 
-      includeExternal: true
-    });
-
+    const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
-
     if (listaAudios.length > 0) {
-      tracks = listaAudios.map(song => {
-        return {
-          name: song.title || song.name || 'Desconocido',
-          artist: song.artist || 'Artista desconocido',
-          url: song.url || song.uri || song.path,
-          cover: song.albumArt || song.albumArtUri || song.cover || '',
-          dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0
-        };
-      }).filter(t => t.url);
-      
+      tracks = listaAudios.map(song => ({
+        name: song.title || song.name || 'Desconocido',
+        artist: song.artist || 'Artista desconocido',
+        url: song.url || song.uri || song.path,
+        cover: song.albumArt || song.albumArtUri || song.cover || '',
+        dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0
+      })).filter(t => t.url);
       sortTracks('newest');
     } else {
-      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música en el teléfono.</li>';
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
     }
   } catch (error) {
-    console.error("Error de MediaStore:", error);
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Ve a Ajustes > Apps > ymPlay y activa los permisos.</li>';
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos.</li>';
   }
 }
 
-// ============================================================
-// 4. RENDERIZAR LISTA
-// ============================================================
+// LISTA
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
-  
   if (tracks.length === 0) {
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música para mostrar</li>';
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música</li>';
     return;
   }
-
   playlistEl.innerHTML = tracks.map((t, i) => {
     let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
     return `
@@ -121,23 +92,18 @@ function renderPlaylist() {
   playlistEl.querySelectorAll('li').forEach(li => {
     li.addEventListener('click', () => {
       const idx = parseInt(li.dataset.index);
-      if (idx !== currentIndex) {
-        cargarCancion(idx);
-      }
+      if (idx !== currentIndex) cargarCancion(idx);
       abrirReproductor();
     });
   });
 }
 
-// ============================================================
-// 5. MENÚ Y ORDENAMIENTO
-// ============================================================
+// MENÚ Y ORDEN
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
   if (criteria === 'newest') tracks.sort((a, b) => b.dateAdded - a.dateAdded);
   else if (criteria === 'oldest') tracks.sort((a, b) => a.dateAdded - b.dateAdded);
   else if (criteria === 'title') tracks.sort((a, b) => a.name.localeCompare(b.name));
-  
   if (currentTrackUrl) currentIndex = tracks.findIndex(t => t.url === currentTrackUrl);
   renderPlaylist();
   closeMenu();
@@ -146,9 +112,7 @@ function sortTracks(criteria) {
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
-// ============================================================
-// 6. REPRODUCTOR Y NOTIFICACIÓN
-// ============================================================
+// REPRODUCTOR
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -188,7 +152,7 @@ function updateMediaSession(track, coverUrl) {
       navigator.mediaSession.setActionHandler('pause', () => audio.pause());
       navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-    } catch (e) { console.log("MediaSession error", e); }
+    } catch (e) {}
   }
 }
 
@@ -202,7 +166,6 @@ function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
 function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
 
-// EVENTOS DE AUDIO
 audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
@@ -228,7 +191,6 @@ if (progressBar) {
   });
 }
 
-// ECUALIZADOR
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
@@ -264,7 +226,6 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   });
 });
 
-// NAVEGACIÓN Y UTILIDADES
 function abrirReproductor() { if(screenPlaylist) screenPlaylist.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenPlaylist) screenPlaylist.style.display = 'flex'; renderPlaylist(); }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
@@ -279,7 +240,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// BOTONES
 if(playBtn) playBtn.addEventListener('click', togglePlay);
 if(prevBtn) prevBtn.addEventListener('click', prevTrack);
 if(nextBtn) nextBtn.addEventListener('click', nextTrack);
@@ -292,7 +252,7 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
-// FONDO PERSONALIZADO
+// LÓGICA DEL FONDO
 if (bgInput) {
   bgInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -302,7 +262,23 @@ if (bgInput) {
       if (customBg) {
         customBg.style.backgroundImage = `url(${url})`;
         document.body.classList.add('has-custom-bg');
+        // Reiniciar el deslizador a 0 al poner una foto nueva
+        if (bgBlurSlider) {
+          bgBlurSlider.value = 0;
+          customBg.style.filter = 'blur(0px)';
+        }
       }
+    }
+  });
+}
+
+// LÓGICA DEL DESLIZADOR DE DESENFOQUE
+if (bgBlurSlider) {
+  bgBlurSlider.addEventListener('input', (e) => {
+    const val = e.target.value;
+    const customBg = document.getElementById('custom-bg');
+    if (customBg) {
+      customBg.style.filter = `blur(${val}px)`;
     }
   });
 }
@@ -324,7 +300,6 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
-// INICIALIZACIÓN
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
 });
