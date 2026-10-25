@@ -1,3 +1,6 @@
+// ============================================================
+// 1. CONFIGURACIÓN E IMPORTACIÓN DEL PLUGIN NATIVO
+// ============================================================
 const audio = new Audio();
 audio.crossOrigin = "anonymous";
 let tracks = [];
@@ -8,6 +11,9 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
+// ============================================================
+// 2. REFERENCIAS DOM
+// ============================================================
 const $ = id => document.getElementById(id);
 const screenPlaylist = $('screen-playlist');
 const screenPlayer = $('screen-player');
@@ -36,7 +42,9 @@ const sortNewestBtn = $('sortNewestBtn');
 const sortOldestBtn = $('sortOldestBtn');
 const sortTitleBtn = $('sortTitleBtn');
 
-// ESCANEO
+// ============================================================
+// 3. ESCANEO NATIVO DE MÚSICA
+// ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
@@ -65,7 +73,9 @@ async function escanearMusicaNativa() {
   }
 }
 
-// LISTA
+// ============================================================
+// 4. RENDERIZAR LISTA (AQUÍ ESTÁ EL ARREGLO)
+// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -89,13 +99,21 @@ function renderPlaylist() {
 
   playlistEl.querySelectorAll('li').forEach(li => {
     li.addEventListener('click', () => {
-      cargarCancion(parseInt(li.dataset.index));
-      abrirReproductor();
+      const idx = parseInt(li.dataset.index);
+      
+      // LA MAGIA ESTÁ AQUÍ: Si es la misma canción, no la reinicies
+      if (idx !== currentIndex) {
+        cargarCancion(idx);
+      }
+      
+      abrirReproductor(); // Abre el menú de reproducción
     });
   });
 }
 
-// ORDENAMIENTO Y MENÚ
+// ============================================================
+// 5. LÓGICA DE ORDENAMIENTO Y MENÚ
+// ============================================================
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
   if (criteria === 'newest') tracks.sort((a, b) => b.dateAdded - a.dateAdded);
@@ -109,7 +127,9 @@ function sortTracks(criteria) {
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
-// CARGAR Y REPRODUCIR
+// ============================================================
+// 6. REPRODUCTOR Y NOTIFICACIÓN
+// ============================================================
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -131,7 +151,6 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  // Llamar a la notificación segura (Web API)
   updateMediaSession(track, coverUrl);
 
   resetProgress();
