@@ -70,7 +70,7 @@ body.has-custom-bg[data-theme="light"] .player-app { background: rgba(255, 255, 
 
 .playlist-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); }
 .playlist { list-style: none; display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
-.playlist li { padding: 10px 12px; border-radius: 12px; background: var(--bg-card-solid); cursor: pointer; transition: background 0.2s, transform 0.1s; border: 1px solid transparent; }
+.playlist li { padding: 10px 12px; border-radius: 12px; background: var(--bg-card-solid); cursor: pointer; transition: background 0.2s, transform 0.1s; border: 1px solid transparent; user-select: none; -webkit-user-select: none; }
 .playlist li:active { transform: scale(0.98); }
 .playlist li.active { border-color: var(--accent); background: var(--accent-glow); }
 .playlist li.active span:first-child { color: var(--accent); }
@@ -79,7 +79,6 @@ body.has-custom-bg[data-theme="light"] .player-app { background: rgba(255, 255, 
 .add-playlist-btn:active { background: var(--slider-track); }
 .add-playlist-btn span { font-size: 20px; }
 
-/* MINI REPRODUCTOR - ESTILOS CLAVE */
 .mini-player { display: flex; align-items: center; padding: 10px; background: var(--bg-card-solid); border: 1px solid var(--border-color); border-bottom: none; border-radius: 16px 16px 0 0; margin: 0 -20px; padding-bottom: env(safe-area-inset-bottom); cursor: pointer; animation: slideUp 0.3s ease; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .mini-cover { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; background: var(--bg-body); }
@@ -146,5 +145,54 @@ input[type="file"] { display: none; }
 .playlist-options-list li { padding: 12px; border-radius: 10px; background: var(--bg-body); border: 1px solid var(--border-color); cursor: pointer; font-weight: 500; display: flex; justify-content: space-between; }
 .playlist-options-list li:active { background: var(--slider-track); }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: var(--slider-track); border-radius: 10px; }
+/* =========================================
+   MENÚ INFERIOR (BOTTOM SHEET)
+   ========================================= */
+.bottom-sheet {
+  position: fixed;
+  bottom: -100%;
+  left: 0;
+  width: 100%;
+  background: #1e1e24; /* Color oscuro sólido para el menú */
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 15px 20px 30px 20px;
+  z-index: 4000;
+  transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.bottom-sheet.show { bottom: 0; }
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sheet-header span { font-size: 16px; font-weight: 700; color: #fff; }
+
+.sheet-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.sheet-btn {
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent); /* Azul brillante por defecto */
+  cursor: pointer;
+  flex: 1;
+  padding: 5px;
+}
+.sheet-btn svg { width: 28px; height: 28px; fill: currentColor; }
+.sheet-btn span { font-size: 11px; font-weight: 500; color: #a0a0b0; text-align: center; line-height: 1.2; }
+.sheet-btn:active { opacity: 0.7; }
