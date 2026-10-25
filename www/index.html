@@ -22,11 +22,19 @@
       <li><button id="sortNewestBtn">⬇️ Más recientes primero</button></li>
       <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
       <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
+      
+      <!-- Botón de Fondo movido al menú -->
+      <li>
+        <label class="menu-btn" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          🖼️ Cambiar Fondo
+          <input type="file" id="bgInput" accept="image/*" style="display: none;">
+        </label>
+      </li>
     </ul>
     
     <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
       <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">
-        Desenfoque de la foto de fondo:
+        Desenfoque de fondo:
       </label>
       <input type="range" id="bgBlurSlider" min="0" max="20" value="0" step="1" style="width: 100%; accent-color: var(--accent);">
     </div>
@@ -52,6 +60,7 @@
         </div>
       </div>
 
+      <!-- Paleta de colores -->
       <div class="palette-switcher">
         <div class="palette-dot active" data-color="ocean" title="Océano"></div>
         <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
@@ -59,25 +68,39 @@
         <div class="palette-dot" data-color="mono" title="Monocromo"></div>
       </div>
 
+      <!-- Botón de Actualizar Música (Movido aquí y más pequeño) -->
+      <div style="display: flex; justify-content: center; margin-bottom: 15px;">
+        <button id="btnEscanear" class="small-update-btn">
+          🔄 Actualizar Música
+        </button>
+      </div>
+
       <div class="playlist-section" style="flex: 1; overflow-y: auto;">
         <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
         <ul class="playlist" id="playlist"></ul>
       </div>
 
-      <div class="bottom-actions" style="margin-top: auto; padding-top: 10px;">
-        <label class="file-label" id="btnEscanear">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>
-          Actualizar Música
-        </label>
-        <label class="bg-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4z"/></svg>
-          Fondo
-          <input type="file" id="bgInput" accept="image/*" />
-        </label>
+      <!-- MINI REPRODUCTOR (Oculto por defecto) -->
+      <div id="mini-player" class="mini-player" style="display: none;">
+        <img id="miniCover" src="" alt="Portada" class="mini-cover">
+        <div class="mini-info" id="miniInfoBtn">
+          <span id="miniTitle">Canción</span>
+          <span id="miniArtist">Artista</span>
+        </div>
+        <div class="mini-controls">
+          <button id="miniPlayBtn" class="mini-btn">
+            <!-- Icono Play inicial -->
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button id="miniNextBtn" class="mini-btn">
+            <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+          </button>
+        </div>
       </div>
+
     </div>
 
-    <!-- PANTALLA 2: REPRODUCTOR -->
+    <!-- PANTALLA 2: REPRODUCTOR COMPLETO -->
     <div id="screen-player" style="display: none; flex-direction: column; height: 100%;">
       <div class="top-bar" style="justify-content: flex-start; margin-bottom: 10px;">
         <button class="icon-btn" id="backToListBtn" style="margin-right: 10px;">
@@ -145,4 +168,4 @@
 
   <script src="script.js"></script>
 </body>
-  </html>
+        </html>
