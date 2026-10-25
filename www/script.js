@@ -10,7 +10,6 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-// ⚠️ IMPORTANTE: CAMBIA ESTE NÚMERO CADA VEZ QUE COMPILES UN APK NUEVO
 const CURRENT_APP_VERSION = "1.0.5"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
@@ -38,13 +37,14 @@ const bgInput = $('bgInput');
 const bgBlurSlider = $('bgBlurSlider');
 const customBg = document.getElementById('custom-bg');
 
-const miniPlayer = $('mini-player');
-const miniCover = $('miniCover');
-const miniTitle = $('miniTitle');
-const miniArtist = $('miniArtist');
-const miniPlayBtn = $('miniPlayBtn');
-const miniNextBtn = $('miniNextBtn');
-const miniInfoBtn = $('miniInfoBtn');
+// Elementos de la Isla Dinámica
+const dynamicIsland = $('dynamic-island');
+const islandCover = $('island-cover');
+const islandTitle = $('island-title');
+const islandArtist = $('island-artist');
+const islandPlayBtn = $('island-play-btn');
+const islandNextBtn = $('island-next-btn');
+const islandPlayIcon = $('island-play-icon');
 
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
@@ -79,7 +79,37 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// AVISO DE ACTUALIZACIÓN
+// LÓGICA DE LA ISLA DINÁMICA
+// ============================================================
+function showDynamicIsland(track, coverUrl) {
+  if (!dynamicIsland) return;
+  dynamicIsland.classList.add('show');
+  islandTitle.textContent = track.name;
+  islandArtist.textContent = track.artist;
+  if (coverUrl) {
+    islandCover.src = coverUrl;
+    islandCover.style.display = 'block';
+  } else {
+    islandCover.style.display = 'none';
+  }
+}
+
+islandPlayBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  togglePlay();
+});
+
+islandNextBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  nextTrack();
+});
+
+dynamicIsland.addEventListener('click', () => {
+  abrirReproductor();
+});
+
+// ============================================================
+// ACTUALIZACIÓN
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -91,21 +121,83 @@ async function checkForUpdates() {
       const response = await fetch(UPDATE_JSON_URL);
       data = await response.json();
     }
-    
     if (data && data.version !== CURRENT_APP_VERSION) {
       if (updateBanner) {
         downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
         updateBanner.classList.add('show');
       }
     }
-  } catch (e) {
-    console.log("No se pudo comprobar la actualización (Offline).");
-  }
+  } catch (e) {}
 }
 if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
 // ============================================================
-// CONTROL DE VISTAS (Canciones, Playlists, Detalle)
+// LÓGICA DEL REPRODUCTOR
+// ============================================================
+function cargarCancion(index) {
+  if (index < 0 || index >= tracks.length) return;
+  currentIndex = index;
+  const track = tracks[index];
+  const playableUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.url) : track.url;
+  audio.src = playableUrl;
+  
+  if(songTitle) songTitle.textContent = track.name;
+  if(songArtist) songArtist.textContent = track.artist;
+  if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
+
+  let coverUrl = '';
+  if (track.cover && coverImg) {
+    coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
+    coverImg.src = coverUrl;
+    coverImg.style.display = 'block';
+  } else if (coverImg) {
+    coverImg.style.display = 'none';
+  }
+
+  // Mostrar Isla Dinámica
+  showDynamicIsland(track, coverUrl);
+
+  resetProgress();
+  playAudio();
+}
+
+function playAudio() {
+  if (currentIndex === -1) return;
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  audio.play().catch(err => console.warn('Error al reproducir:', err));
+}
+
+function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
+function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
+function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
+
+audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return;
+  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
+  if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
+});
+audio.addEventListener('play', () => { 
+  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
+  if(islandPlayIcon) islandPlayIcon.setAttribute('d', 'M6 4h4v16H6zm8 0h4v16h-4z');
+  setupAudioContext();
+});
+audio.addEventListener('pause', () => { 
+  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+  if(islandPlayIcon) islandPlayIcon.setAttribute('d', 'M8 5v14l11-7z');
+});
+audio.addEventListener('ended', nextTrack);
+
+if (progressBar) {
+  progressBar.addEventListener('click', e => {
+    if (!audio.duration) return;
+    const rect = progressBar.getBoundingClientRect();
+    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+  });
+}
+
+// ============================================================
+// RESTO DEL CÓDIGO (VISTAS, ESCANEO, ECUALIZADOR, ETC.)
 // ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
@@ -125,9 +217,6 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
   });
 });
 
-// ============================================================
-// LÓGICA DE PLAYLISTS
-// ============================================================
 function loadPlaylists() { const saved = localStorage.getItem('ymPlay_playlists'); if (saved) playlists = JSON.parse(saved); }
 function savePlaylists() { localStorage.setItem('ymPlay_playlists', JSON.stringify(playlists)); }
 
@@ -184,9 +273,6 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 });
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
-// ============================================================
-// RENDERIZAR LISTA PRINCIPAL
-// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -200,9 +286,6 @@ function renderPlaylist() {
   });
 }
 
-// ============================================================
-// ESCANEO DE MÚSICA
-// ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
@@ -213,21 +296,17 @@ async function escanearMusicaNativa() {
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Solicitando permiso de música...</li>';
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
-    
     const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
-
     if (listaAudios.length > 0) {
-      tracks = listaAudios.map(song => {
-        return {
-          name: song.title || song.name || 'Desconocido',
-          artist: song.artist || 'Artista desconocido',
-          url: song.url || song.uri || song.path,
-          cover: song.albumArt || song.albumArtUri || song.cover || '',
-          dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-          duration: song.duration || song.durationMs || 0 
-        };
-      }).filter(t => {
+      tracks = listaAudios.map(song => ({
+        name: song.title || song.name || 'Desconocido',
+        artist: song.artist || 'Artista desconocido',
+        url: song.url || song.uri || song.path,
+        cover: song.albumArt || song.albumArtUri || song.cover || '',
+        dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
+        duration: song.duration || song.durationMs || 0 
+      })).filter(t => {
         if (!t.url) return false;
         let dur = t.duration;
         if (dur > 0 && dur < 1000) dur = dur * 1000; 
@@ -238,7 +317,6 @@ async function escanearMusicaNativa() {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
     }
   } catch (error) {
-    console.error(error);
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos en Ajustes.</li>';
   }
 }
@@ -253,101 +331,9 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
-// ============================================================
-// REPRODUCTOR Y NOTIFICACIONES NATIVAS
-// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
-function cargarCancion(index) {
-  if (index < 0 || index >= tracks.length) return;
-  currentIndex = index;
-  const track = tracks[index];
-  const playableUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.url) : track.url;
-  audio.src = playableUrl;
-  
-  if(songTitle) songTitle.textContent = track.name;
-  if(songArtist) songArtist.textContent = track.artist;
-  if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
-
-  let coverUrl = '';
-  if (track.cover && coverImg) {
-    coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
-    coverImg.src = coverUrl;
-    coverImg.style.display = 'block';
-  } else if (coverImg) {
-    coverImg.style.display = 'none';
-  }
-
-  if (miniPlayer) {
-    miniPlayer.style.display = 'flex';
-    miniTitle.textContent = track.name;
-    miniArtist.textContent = track.artist;
-    if (coverUrl) { miniCover.src = coverUrl; miniCover.style.display = 'block'; } else { miniCover.style.display = 'none'; }
-  }
-
-  setupNativeMediaSession(track, coverUrl);
-  resetProgress();
-  playAudio();
-}
-
-async function setupNativeMediaSession(track, coverUrl) {
-  const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
-  if (MediaSessionPlugin) {
-    try {
-      await MediaSessionPlugin.setMetadata({
-        title: track.name, artist: track.artist, album: 'ymPlay',
-        artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-      });
-      await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
-      await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
-      await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
-      await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
-      await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
-    } catch (e) { console.warn("Error en MediaSession:", e); }
-  }
-}
-
-function playAudio() {
-  if (currentIndex === -1) return;
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-  audio.play().catch(err => console.warn('Error al reproducir:', err));
-}
-
-function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
-function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
-function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
-
-audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
-audio.addEventListener('timeupdate', () => {
-  if (!audio.duration) return;
-  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
-  if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
-});
-audio.addEventListener('play', () => { 
-  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
-  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
-  setupAudioContext();
-  if (window.Capacitor?.Plugins?.MediaSession) window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'playing' });
-});
-audio.addEventListener('pause', () => { 
-  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
-  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-  if (window.Capacitor?.Plugins?.MediaSession) window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'paused' });
-});
-audio.addEventListener('ended', nextTrack);
-
-if (progressBar) {
-  progressBar.addEventListener('click', e => {
-    if (!audio.duration) return;
-    const rect = progressBar.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
-  });
-}
-
-// ============================================================
-// ECUALIZADOR
-// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
@@ -369,9 +355,6 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
 });
 
-// ============================================================
-// NAVEGACIÓN Y FONDO
-// ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
@@ -392,10 +375,6 @@ if(sortNewestBtn) sortNewestBtn.addEventListener('click', () => sortTracks('newe
 if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('oldest'));
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
-if (miniPlayBtn) miniPlayBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
-if (miniNextBtn) miniNextBtn.addEventListener('click', (e) => { e.stopPropagation(); nextTrack(); });
-if (miniInfoBtn) miniInfoBtn.addEventListener('click', abrirReproductor);
-if (miniCover) miniCover.addEventListener('click', abrirReproductor);
 
 function applyBackground(imageSrc, blurAmount) { if (!customBg) return; customBg.style.backgroundImage = `url(${imageSrc})`; customBg.style.filter = `blur(${blurAmount}px)`; document.body.classList.add('has-custom-bg'); }
 if (bgInput) { bgInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { const base64Image = event.target.result; try { localStorage.setItem('ymPlay_customBg', base64Image); localStorage.setItem('ymPlay_bgBlur', '0'); if (bgBlurSlider) bgBlurSlider.value = 0; applyBackground(base64Image, 0); } catch (err) { alert("La imagen es muy grande."); } }; reader.readAsDataURL(file); } }); }
@@ -405,9 +384,6 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); }); });
 
-// ============================================================
-// BOTÓN ATRÁS (ANDROID)
-// ============================================================
 function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
@@ -422,13 +398,9 @@ function setupBackButton() {
   }
 }
 
-// ============================================================
-// ARRANQUE DE LA APP Y PERMISOS DE NOTIFICACIÓN
-// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   
-  // PEDIR PERMISO DE NOTIFICACIONES (Android 13+)
   if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
     window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(result => {
       console.log("Permiso de notificaciones:", result.display);
