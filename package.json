@@ -1,17 +1,64 @@
-{
-  "name": "ymplay",
-  "version": "1.0.0",
-  "description": "Mi reproductor de musica",
-  "dependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/app": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/local-notifications": "^6.0.0",
-    "@odion-cloud/capacitor-mediastore": "^1.0.21",
-    "capacitor-floating-bubble": "^0.0.1-alpha.3"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/assets": "^3.0.5"
-  }
-}
+name: Compilar APK Firmado
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # AQUÍ ESTÁ LA MAGIA: --legacy-peer-deps ignora el conflicto de versiones
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Generar Íconos y Splash
+        run: npx @capacitor/assets generate --android
+
+      - name: Sync Capacitor
+        run: npx cap sync
+
+      - name: Add all required permissions to Manifest
+        run: |
+          # Permisos de audio, notificaciones, servicio en primer plano y ventana flotante (SYSTEM_ALERT_WINDOW)
+          sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
+
+      - name: Build debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Extract signing key
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
+
+      - name: Sign APK with apksigner
+        run: |
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          $BUILD_TOOLS_DIR/zipalign -v -p 4 android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/app-debug-aligned.apk
+          $BUILD_TOOLS_DIR/apksigner sign --ks android/release.p12 \
+            --ks-type PKCS12 \
+            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            --ks-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --key-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --out android/app/build/outputs/apk/debug/app-debug-signed.apk \
+            android/app/build/outputs/apk/debug/app-debug-aligned.apk
+
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ymPlay-APK
+          path: android/app/build/outputs/apk/debug/app-debug-signed.apk
