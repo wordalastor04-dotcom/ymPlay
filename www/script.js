@@ -31,6 +31,15 @@ const bgInput = $('bgInput');
 const bgBlurSlider = $('bgBlurSlider');
 const customBg = document.getElementById('custom-bg');
 
+// Elementos del Mini Reproductor
+const miniPlayer = $('mini-player');
+const miniCover = $('miniCover');
+const miniTitle = $('miniTitle');
+const miniArtist = $('miniArtist');
+const miniPlayBtn = $('miniPlayBtn');
+const miniNextBtn = $('miniNextBtn');
+const miniInfoBtn = $('miniInfoBtn');
+
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
 const menuOverlay = $('menu-overlay');
@@ -113,7 +122,7 @@ function sortTracks(criteria) {
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
-// REPRODUCTOR
+// REPRODUCTOR Y MINI REPRODUCTOR
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -133,6 +142,19 @@ function cargarCancion(index) {
     coverImg.style.display = 'block';
   } else if (coverImg) {
     coverImg.style.display = 'none';
+  }
+
+  // Actualizar el Mini Reproductor y Mostrarlo
+  if (miniPlayer) {
+    miniPlayer.style.display = 'flex';
+    miniTitle.textContent = track.name;
+    miniArtist.textContent = track.artist;
+    if (coverUrl) {
+      miniCover.src = coverUrl;
+      miniCover.style.display = 'block';
+    } else {
+      miniCover.style.display = 'none';
+    }
   }
 
   updateMediaSession(track, coverUrl);
@@ -175,11 +197,15 @@ audio.addEventListener('timeupdate', () => {
 });
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
+  // Actualizar icono Mini Reproductor
+  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
   setupAudioContext();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
 audio.addEventListener('pause', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+  // Actualizar icono Mini Reproductor
+  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 });
 audio.addEventListener('ended', nextTrack);
@@ -253,11 +279,31 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
-// ==========================================
-// LÓGICA DEL FONDO (CON MEMORIA)
-// ==========================================
+// EVENTOS DEL MINI REPRODUCTOR
+if (miniPlayBtn) {
+  miniPlayBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Evita que se abra el reproductor completo al tocar play
+    togglePlay();
+  });
+}
+if (miniNextBtn) {
+  miniNextBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    nextTrack();
+  });
+}
+if (miniInfoBtn) {
+  miniInfoBtn.addEventListener('click', () => {
+    abrirReproductor(); // Abre el menú grande al tocar la info o la foto
+  });
+}
+if (miniCover) {
+  miniCover.addEventListener('click', () => {
+    abrirReproductor();
+  });
+}
 
-// Función para aplicar el fondo y el blur
+// LÓGICA DEL FONDO
 function applyBackground(imageSrc, blurAmount) {
   if (!customBg) return;
   customBg.style.backgroundImage = `url(${imageSrc})`;
@@ -265,7 +311,6 @@ function applyBackground(imageSrc, blurAmount) {
   document.body.classList.add('has-custom-bg');
 }
 
-// Al seleccionar una nueva foto
 if (bgInput) {
   bgInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -274,14 +319,12 @@ if (bgInput) {
       reader.onload = (event) => {
         const base64Image = event.target.result;
         try {
-          // Guardar en la memoria del celular
           localStorage.setItem('ymPlay_customBg', base64Image);
-          localStorage.setItem('ymPlay_bgBlur', '0'); // Reiniciar blur
-          
+          localStorage.setItem('ymPlay_bgBlur', '0');
           if (bgBlurSlider) bgBlurSlider.value = 0;
           applyBackground(base64Image, 0);
         } catch (err) {
-          alert("La imagen es muy grande para guardarla. Intenta con una foto más pequeña.");
+          alert("La imagen es muy grande para guardarla. Intenta con una más pequeña.");
         }
       };
       reader.readAsDataURL(file);
@@ -289,14 +332,11 @@ if (bgInput) {
   });
 }
 
-// Al mover el deslizador de desenfoque
 if (bgBlurSlider) {
   bgBlurSlider.addEventListener('input', (e) => {
     const val = e.target.value;
-    localStorage.setItem('ymPlay_bgBlur', val); // Guardar el nivel
-    if (customBg) {
-      customBg.style.filter = `blur(${val}px)`;
-    }
+    localStorage.setItem('ymPlay_bgBlur', val);
+    if (customBg) customBg.style.filter = `blur(${val}px)`;
   });
 }
 
@@ -317,17 +357,13 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
-// ARRANQUE DE LA APP
+// ARRANQUE
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Cargar el fondo guardado (si existe)
   const savedBg = localStorage.getItem('ymPlay_customBg');
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
-  
   if (savedBg) {
     if (bgBlurSlider) bgBlurSlider.value = savedBlur;
     applyBackground(savedBg, savedBlur);
   }
-
-  // 2. Escanear música
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
 });
