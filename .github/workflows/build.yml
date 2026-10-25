@@ -32,11 +32,7 @@ jobs:
 
       - name: Add all required permissions to Manifest
         run: |
-          # Inyectar todos los permisos necesarios en el Manifest
-          sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
-          
-          # Forzar el tipo de servicio en primer plano para el reproductor nativo
-          sed -i 's/<service android:name="com.jofr.capacitor.mediasession.MediaSessionService" \/>/<service android:name="com.jofr.capacitor.mediasession.MediaSessionService" android:foregroundServiceType="mediaPlayback" \/>/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         run: |
