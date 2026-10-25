@@ -3,6 +3,7 @@ audio.crossOrigin = "anonymous";
 let tracks = [];
 let currentIndex = -1;
 
+// Variables para Playlists
 let playlists = [];
 let currentPlaylistId = null;
 
@@ -11,7 +12,8 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-const CURRENT_APP_VERSION = "1.0.4";
+// ⚠️ IMPORTANTE: Cambia este número cuando compiles un nuevo APK
+const CURRENT_APP_VERSION = "1.0.5"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -58,6 +60,7 @@ const updateBanner = $('update-banner');
 const downloadUpdateBtn = $('downloadUpdateBtn');
 const closeUpdateBtn = $('closeUpdateBtn');
 
+// Elementos de Playlists y Vistas
 const viewSongs = $('view-songs');
 const viewPlaylists = $('view-playlists');
 const viewPlaylistDetail = $('view-playlist-detail');
@@ -78,6 +81,9 @@ const allSongsOptions = $('all-songs-options');
 const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
+// ============================================================
+// CONTROL DE VISTAS (Canciones, Playlists, Detalle)
+// ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none';
   viewPlaylists.style.display = 'none';
@@ -110,6 +116,9 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
   });
 });
 
+// ============================================================
+// LÓGICA DE PLAYLISTS
+// ============================================================
 function loadPlaylists() {
   const saved = localStorage.getItem('ymPlay_playlists');
   if (saved) playlists = JSON.parse(saved);
@@ -243,6 +252,9 @@ closeAddSongsModal.addEventListener('click', () => {
   renderPlaylistDetail();
 });
 
+// ============================================================
+// RENDERIZAR LISTA PRINCIPAL
+// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -274,37 +286,30 @@ function renderPlaylist() {
   });
 }
 
-async function checkForUpdates() {
-  try {
-    let data;
-    if (window.Capacitor && window.Capacitor.Plugins.CapacitorHttp) {
-      const response = await window.Capacitor.Plugins.CapacitorHttp.get({ url: UPDATE_JSON_URL });
-      data = response.data;
-    } else {
-      const response = await fetch(UPDATE_JSON_URL);
-      data = await response.json();
-    }
-    if (data && data.version !== CURRENT_APP_VERSION) {
-      if (updateBanner) {
-        downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
-        updateBanner.classList.add('show');
-      }
-    }
-  } catch (e) {}
-}
-if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
-
+// ============================================================
+// ESCANEO DE MÚSICA Y PERMISOS
+// ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
     return;
   }
+
   try {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    // Pedir permiso de audio
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
-    const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
+
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    
+    const result = await MediaStorePlugin.getMediasByType({ 
+      mediaType: 'audio', 
+      sortBy: 'TITLE', 
+      includeExternal: true 
+    });
+    
     const listaAudios = result.media || result.medias || [];
+
     if (listaAudios.length > 0) {
       tracks = listaAudios.map(song => {
         return {
@@ -319,14 +324,15 @@ async function escanearMusicaNativa() {
         if (!t.url) return false;
         let dur = t.duration;
         if (dur > 0 && dur < 1000) dur = dur * 1000; 
-        return dur >= 60000;
+        return dur >= 60000; // Solo canciones mayores a 1 minuto
       });
       sortTracks('newest');
     } else {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
     }
   } catch (error) {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos.</li>';
+    console.error(error);
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos en Ajustes.</li>';
   }
 }
 
@@ -340,6 +346,9 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
+// ============================================================
+// LÓGICA DEL REPRODUCTOR Y NOTIFICACIONES
+// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
@@ -432,6 +441,9 @@ if (progressBar) {
   });
 }
 
+// ============================================================
+// ECUALIZADOR
+// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
@@ -467,6 +479,9 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   });
 });
 
+// ============================================================
+// NAVEGACIÓN Y FONDO
+// ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
@@ -548,6 +563,30 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
+// ============================================================
+// ACTUALIZACIONES Y BOTÓN ATRÁS (ANDROID)
+// ============================================================
+async function checkForUpdates() {
+  try {
+    let data;
+    if (window.Capacitor && window.Capacitor.Plugins.CapacitorHttp) {
+      const response = await window.Capacitor.Plugins.CapacitorHttp.get({ url: UPDATE_JSON_URL });
+      data = response.data;
+    } else {
+      const response = await fetch(UPDATE_JSON_URL);
+      data = await response.json();
+    }
+    if (data && data.version !== CURRENT_APP_VERSION) {
+      if (updateBanner) {
+        downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
+        updateBanner.classList.add('show');
+      }
+    }
+  } catch (e) {}
+}
+
+if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
+
 function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
@@ -572,8 +611,22 @@ function setupBackButton() {
   }
 }
 
+// ============================================================
+// ARRANQUE DE LA APP Y PERMISOS DE NOTIFICACIÓN
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
+  
+  // Pedir permiso para Notificaciones (Android 13+)
+  if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
+    window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(result => {
+      console.log("Permiso de notificaciones:", result.display);
+    });
+  } else if ('Notification' in window) {
+    Notification.requestPermission();
+  }
+
+  // Cargar Fondo guardado
   const savedBg = localStorage.getItem('ymPlay_customBg');
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) {
@@ -581,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyBackground(savedBg, savedBlur);
   }
   
+  // Iniciar funciones
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
   checkForUpdates();
   setupBackButton();
