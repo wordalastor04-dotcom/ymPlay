@@ -9,7 +9,7 @@ let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 // ⚠️ IMPORTANTE: Cambia este número cuando compiles un nuevo APK
-const CURRENT_APP_VERSION = "1.0.0"; 
+const CURRENT_APP_VERSION = "1.0.3"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
