@@ -10,7 +10,6 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-// ⚠️ IMPORTANTE: CAMBIA ESTE NÚMERO CADA VEZ QUE COMPILES UN APK NUEVO
 const CURRENT_APP_VERSION = "1.0.6"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
@@ -70,43 +69,54 @@ const allSongsOptions = $('all-songs-options');
 const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
-// ============================================================
-// LÓGICA DE LA BURBUJA FLOTANTE NATIVA (Sobre otras apps)
-// ============================================================
-async function setupFloatingBubble(track) {
-  // Intentar usar el plugin de burbuja
-  const BubblePlugin = window.Capacitor?.Plugins?.FloatingBubble || window.Capacitor?.Plugins?.Bubble;
-  
-  if (!BubblePlugin) {
-    console.log("Plugin de burbuja no detectado.");
-    return;
-  }
+// Elemento del botón de la burbuja
+const btnToggleBubble = $('btnToggleBubble');
 
-  try {
-    // 1. Pedir permiso para dibujar sobre otras apps
-    const permission = await BubblePlugin.requestPermission();
+// ============================================================
+// LÓGICA DEL BOTÓN DE LA ISLA DINÁMICA (BURBUJA)
+// ============================================================
+if (btnToggleBubble) {
+  btnToggleBubble.addEventListener('click', async () => {
+    const BubblePlugin = window.Capacitor?.Plugins?.FloatingBubble;
     
-    if (permission.granted) {
-      // 2. Mostrar la burbuja con el ícono de la app
-      await BubblePlugin.show({
-        // Usamos una URL de tu logo en GitHub Pages
-        image: "https://wordalastor04-dotcom.github.io/ymPlay/resources/icon.png",
-        // Si el plugin soporta texto, lo añadimos
-        text: track.name 
-      });
+    if (!BubblePlugin) {
+      alert("El plugin de burbuja no está instalado en este APK. Compila la versión más reciente.");
+      return;
     }
-  } catch (error) {
-    console.log("Error al mostrar la burbuja:", error);
-  }
+
+    try {
+      // 1. Pedir el permiso de "Mostrar sobre otras apps"
+      const permission = await BubblePlugin.requestPermission();
+      
+      if (permission.granted) {
+        // 2. Si tenemos permiso, mostramos la burbuja
+        await BubblePlugin.show({
+          image: "https://wordalastor04-dotcom.github.io/ymPlay/resources/icon.png",
+          text: "ymPlay"
+        });
+        alert("¡Isla Dinámica activada! Minimiza la app para verla sobre otras aplicaciones.");
+        closeMenu(); // Cerramos el menú para que veas la burbuja
+      } else {
+        alert("Debes permitir 'Mostrar sobre otras apps' en los ajustes de Android para usar la burbuja.");
+      }
+    } catch (error) {
+      console.error("Error al mostrar la burbuja:", error);
+      alert("Hubo un error al crear la burbuja. Asegúrate de dar el permiso en Ajustes > Apps > ymPlay > Mostrar sobre otras apps.");
+    }
+  });
 }
 
-// Escuchar el toque en la burbuja flotante para abrir la app
+// ============================================================
+// ESCUCHAR TOQUE EN LA BURBUJA
+// ============================================================
 document.addEventListener('floatingBubbleClick', () => {
+  // Si el usuario toca la burbuja, abrimos la app en el reproductor
   abrirReproductor();
+  // Y cerramos la burbuja opcionalmente (depende de cómo se comporte el plugin)
 });
 
 // ============================================================
-// AVISO DE ACTUALIZACIÓN
+// RESTO DEL CÓDIGO (ACTUALIZACIONES, VISTAS, REPRODUCTOR)
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -118,22 +128,16 @@ async function checkForUpdates() {
       const response = await fetch(UPDATE_JSON_URL);
       data = await response.json();
     }
-    
     if (data && data.version !== CURRENT_APP_VERSION) {
       if (updateBanner) {
         downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
         updateBanner.classList.add('show');
       }
     }
-  } catch (e) {
-    console.log("No se pudo comprobar la actualización (Offline).");
-  }
+  } catch (e) {}
 }
 if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
-// ============================================================
-// CONTROL DE VISTAS (Canciones, Playlists, Detalle)
-// ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
   if (viewName === 'songs') {
@@ -152,9 +156,6 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
   });
 });
 
-// ============================================================
-// LÓGICA DE PLAYLISTS
-// ============================================================
 function loadPlaylists() { const saved = localStorage.getItem('ymPlay_playlists'); if (saved) playlists = JSON.parse(saved); }
 function savePlaylists() { localStorage.setItem('ymPlay_playlists', JSON.stringify(playlists)); }
 
@@ -211,9 +212,6 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 });
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
-// ============================================================
-// RENDERIZAR LISTA PRINCIPAL
-// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -227,9 +225,6 @@ function renderPlaylist() {
   });
 }
 
-// ============================================================
-// ESCANEO DE MÚSICA Y PERMISOS
-// ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
@@ -275,9 +270,6 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
-// ============================================================
-// REPRODUCTOR Y NOTIFICACIONES
-// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
@@ -301,10 +293,7 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  // ACTIVAR BURBUJA FLOTANTE
-  setupFloatingBubble(track);
-
-  // ACTUALIZAR NOTIFICACIÓN NATIVA (Web Media Session)
+  // ACTUALIZAR NOTIFICACIÓN NATIVA
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.name, artist: track.artist, album: 'ymPlay',
@@ -355,9 +344,6 @@ if (progressBar) {
   });
 }
 
-// ============================================================
-// ECUALIZADOR
-// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
@@ -379,9 +365,6 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
 });
 
-// ============================================================
-// NAVEGACIÓN Y FONDO
-// ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
@@ -411,9 +394,6 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); }); });
 
-// ============================================================
-// BOTÓN ATRÁS (ANDROID)
-// ============================================================
 function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
@@ -428,9 +408,6 @@ function setupBackButton() {
   }
 }
 
-// ============================================================
-// ARRANQUE DE LA APP Y PERMISOS DE NOTIFICACIÓN
-// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   
