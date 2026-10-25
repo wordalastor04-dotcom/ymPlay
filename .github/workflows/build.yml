@@ -32,7 +32,20 @@ jobs:
 
       - name: Add all required permissions to Manifest
         run: |
+          # Permisos de audio, notificaciones y WAKE_LOCK (para no cortar el audio)
           sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
+
+      - name: Configure FileProvider for Sharing
+        run: |
+          # Crea la carpeta y el archivo XML que permite a Android compartir los archivos
+          mkdir -p android/app/src/main/res/xml
+          echo '<?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="cache" path="." />
+              <external-path name="external" path="." />
+              <external-files-path name="external_files" path="." />
+              <files-path name="files" path="." />
+          </paths>' > android/app/src/main/res/xml/file_paths.xml
 
       - name: Build debug APK
         run: |
