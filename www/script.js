@@ -13,7 +13,7 @@ let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 // ⚠️ IMPORTANTE: Cambia este número cuando compiles un nuevo APK
-const CURRENT_APP_VERSION = "1.0.5"; 
+const CURRENT_APP_VERSION = "1.0.4"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -287,7 +287,7 @@ function renderPlaylist() {
 }
 
 // ============================================================
-// ESCANEO DE MÚSICA Y PERMISOS
+// ESCANEO DE MÚSICA (Con permisos de Android 13+)
 // ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
@@ -297,7 +297,12 @@ async function escanearMusicaNativa() {
   }
 
   try {
-    // Pedir permiso de audio
+    // Forzar petición de permiso nativo para Android 13+
+    if (window.Capacitor.Plugins.Permissions) {
+      await window.Capacitor.Plugins.Permissions.request({ name: 'readMediaAudio' });
+    }
+    
+    // Petición a través del plugin
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
 
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
@@ -326,13 +331,25 @@ async function escanearMusicaNativa() {
         if (dur > 0 && dur < 1000) dur = dur * 1000; 
         return dur >= 60000; // Solo canciones mayores a 1 minuto
       });
+      
+      // Si por alguna razón el filtro deja todo vacío, mostramos todo
+      if (tracks.length === 0 && listaAudios.length > 0) {
+        tracks = listaAudios.map(song => ({
+          name: song.title || 'Desconocido',
+          artist: song.artist || 'Desconocido',
+          url: song.url || song.uri || song.path,
+          cover: song.albumArt || '',
+          dateAdded: 0
+        })).filter(t => t.url);
+      }
+
       sortTracks('newest');
     } else {
-      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música. Revisa los permisos en Ajustes.</li>';
     }
   } catch (error) {
     console.error(error);
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos en Ajustes.</li>';
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Concede el permiso de "Música y audio".</li>';
   }
 }
 
@@ -347,7 +364,7 @@ function sortTracks(criteria) {
 }
 
 // ============================================================
-// LÓGICA DEL REPRODUCTOR Y NOTIFICACIONES
+// REPRODUCTOR Y PANEL DE NOTIFICACIONES (NATIVO)
 // ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
@@ -384,23 +401,30 @@ function cargarCancion(index) {
     }
   }
 
-  updateMediaSession(track, coverUrl);
+  setupNativeMediaSession(track, coverUrl); // Configurar notificación nativa
   resetProgress();
   playAudio();
 }
 
-function updateMediaSession(track, coverUrl) {
-  if ('mediaSession' in navigator) {
+// Configuración del plugin nativo @jofr/capacitor-media-session
+async function setupNativeMediaSession(track, coverUrl) {
+  const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
+  if (MediaSessionPlugin) {
     try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.name, artist: track.artist, album: 'ymPlay',
+      await MediaSessionPlugin.setMetadata({
+        title: track.name,
+        artist: track.artist,
+        album: 'ymPlay',
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
-      navigator.mediaSession.setActionHandler('play', () => playAudio());
-      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-      navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
-      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-    } catch (e) {}
+      await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
+      await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
+      await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
+      await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
+      await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
+    } catch (e) {
+      console.warn("Error en MediaSession nativo:", e);
+    }
   }
 }
 
@@ -424,12 +448,16 @@ audio.addEventListener('play', () => {
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
   setupAudioContext();
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  if (window.Capacitor?.Plugins?.MediaSession) {
+    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'playing' });
+  }
 });
 audio.addEventListener('pause', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  if (window.Capacitor?.Plugins?.MediaSession) {
+    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'paused' });
+  }
 });
 audio.addEventListener('ended', nextTrack);
 
@@ -480,7 +508,7 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
 });
 
 // ============================================================
-// NAVEGACIÓN Y FONDO
+// NAVEGACIÓN, FONDO Y TEMA
 // ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
