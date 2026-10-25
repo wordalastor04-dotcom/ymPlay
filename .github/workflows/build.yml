@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 20
 
-      # AQUÍ ESTÁ LA MAGIA: --legacy-peer-deps ignora el conflicto de versiones
+      # Instalar dependencias ignorando conflictos de versiones
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -33,6 +33,7 @@ jobs:
 
       - name: Add all required permissions to Manifest
         run: |
+          # Permisos de audio, notificaciones, servicio en primer plano y ventana flotante (SYSTEM_ALERT_WINDOW)
           sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
