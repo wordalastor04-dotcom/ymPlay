@@ -452,34 +452,86 @@ if (progressBar) {
 }
 
 // ============================================================
-// 9. ESCANEAR
+// 9. ESCANEAR (CON FILTRO ANTI-BASURA DE 60 SEGUNDOS)
 // ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) return;
   
   try {
-    if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>'; }
+    if (tracks.length === 0) { 
+        if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>'; 
+    }
+    
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
     const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
     
     if (listaAudios.length > 0) {
       const newTracks = listaAudios.map(song => ({
-        name: song.title || song.name || 'Desconocido', artist: song.artist || 'Artista desconocido',
-        url: song.url || song.uri || song.path, cover: song.albumArt || song.albumArtUri || song.cover || '',
+        name: song.title || song.name || 'Desconocido', 
+        artist: song.artist || 'Artista desconocido',
+        url: song.url || song.uri || song.path, 
+        cover: song.albumArt || song.albumArtUri || song.cover || '',
         dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-        duration: song.duration || song.durationMs || 0, hidden: false, isFavorite: false
-      })).filter(t => t.url);
+        duration: song.duration || song.durationMs || 0, 
+        hidden: false, 
+        isFavorite: false
+      })).filter(t => {
+        // 1. Verificar que el archivo tenga una URL válida
+        if (!t.url) return false;
+
+        // 2. FILTRO DE DURACIÓN: Ignorar audios menores a 1 minuto (60 segundos)
+        // Comprobamos si viene en milisegundos o segundos para hacerlo a prueba de fallos
+        const duracionSegundos = t.duration > 1000 ? t.duration / 1000 : t.duration;
+        if (duracionSegundos < 60) return false; 
+
+        // 3. FILTRO DE RUTAS: Excluir carpetas de mensajería y sistema
+        const urlMinuscula = t.url.toLowerCase();
+        const carpetasBasura = [
+            '/whatsapp/', 
+            '/telegram/', 
+            '/android/media/com.whatsapp/',
+            '/android/media/org.telegram.messenger/',
+            '/notifications/', 
+            '/ringtones/', 
+            '/alarms/',
+            '/ui/' // Sonidos de la interfaz de Android
+        ];
+        if (carpetasBasura.some(carpeta => urlMinuscula.includes(carpeta))) return false;
+
+        // 4. FILTRO DE NOMBRES: Excluir notas de voz de WhatsApp (suelen empezar con "PTT-")
+        const nombreMinuscula = t.name.toLowerCase();
+        if (nombreMinuscula.startsWith('ptt-') || nombreMinuscula.includes('whatsapp audio') || nombreMinuscula.includes('audio de whatsapp')) return false;
+
+        // Si el archivo pasó todos los filtros, se considera música válida
+        return true;
+      });
 
       if (newTracks.length > 0) {
         const hiddenUrls = tracks.filter(t => t.hidden).map(t => t.url);
         const favUrls = tracks.filter(t => t.isFavorite).map(t => t.url);
-        tracks = newTracks.map(t => ({ ...t, hidden: hiddenUrls.includes(t.url), isFavorite: favUrls.includes(t.url) }));
-        saveTracksCache(); sortTracks('newest'); restaurarSesion();
-      } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; }
-    } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; }
-  } catch (error) {}
+        
+        // Mezclamos los nuevos tracks con los estados previos (ocultos y favoritos)
+        tracks = newTracks.map(t => ({ 
+            ...t, 
+            hidden: hiddenUrls.includes(t.url), 
+            isFavorite: favUrls.includes(t.url) 
+        }));
+        
+        saveTracksCache(); 
+        sortTracks('newest'); 
+        restaurarSesion();
+        
+      } else if (tracks.length === 0) { 
+        if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música (Solo audios mayores a 1 min).</li>'; 
+      }
+    } else if (tracks.length === 0) { 
+        if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música en el dispositivo.</li>'; 
+    }
+  } catch (error) {
+    console.error("Error al escanear la música:", error);
+  }
 }
 
 function sortTracks(criteria) {
