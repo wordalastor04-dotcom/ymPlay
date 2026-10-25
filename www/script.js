@@ -8,6 +8,11 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
+// ⚠️ IMPORTANTE: Cambia este número cuando compiles un nuevo APK
+const CURRENT_APP_VERSION = "1.0.0";
+const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
+const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
+
 const $ = id => document.getElementById(id);
 const screenPlaylist = $('screen-playlist');
 const screenPlayer = $('screen-player');
@@ -31,7 +36,6 @@ const bgInput = $('bgInput');
 const bgBlurSlider = $('bgBlurSlider');
 const customBg = document.getElementById('custom-bg');
 
-// Elementos del Mini Reproductor
 const miniPlayer = $('mini-player');
 const miniCover = $('miniCover');
 const miniTitle = $('miniTitle');
@@ -47,6 +51,35 @@ const closeMenuBtn = $('closeMenuBtn');
 const sortNewestBtn = $('sortNewestBtn');
 const sortOldestBtn = $('sortOldestBtn');
 const sortTitleBtn = $('sortTitleBtn');
+
+// BANNER DE ACTUALIZACIÓN
+const updateBanner = $('update-banner');
+const downloadUpdateBtn = $('downloadUpdateBtn');
+const closeUpdateBtn = $('closeUpdateBtn');
+
+async function checkForUpdates() {
+  try {
+    const response = await fetch(UPDATE_JSON_URL);
+    const data = await response.json();
+    
+    // Si la versión en internet es diferente a la de esta app
+    if (data.version !== CURRENT_APP_VERSION) {
+      if (updateBanner) {
+        // Le ponemos el enlace de descarga al botón
+        downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
+        updateBanner.classList.add('show');
+      }
+    }
+  } catch (e) {
+    console.log("No se pudo comprobar la actualización");
+  }
+}
+
+if (closeUpdateBtn) {
+  closeUpdateBtn.onclick = () => {
+    updateBanner.classList.remove('show');
+  };
+}
 
 // ESCANEO
 async function escanearMusicaNativa() {
@@ -122,7 +155,7 @@ function sortTracks(criteria) {
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
-// REPRODUCTOR Y MINI REPRODUCTOR
+// REPRODUCTOR
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -144,7 +177,6 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  // Actualizar el Mini Reproductor y Mostrarlo
   if (miniPlayer) {
     miniPlayer.style.display = 'flex';
     miniTitle.textContent = track.name;
@@ -166,9 +198,7 @@ function updateMediaSession(track, coverUrl) {
   if ('mediaSession' in navigator) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.name,
-        artist: track.artist,
-        album: 'ymPlay',
+        title: track.name, artist: track.artist, album: 'ymPlay',
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
       navigator.mediaSession.setActionHandler('play', () => playAudio());
@@ -197,14 +227,12 @@ audio.addEventListener('timeupdate', () => {
 });
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
-  // Actualizar icono Mini Reproductor
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
   setupAudioContext();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
 audio.addEventListener('pause', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
-  // Actualizar icono Mini Reproductor
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 });
@@ -279,31 +307,12 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
-// EVENTOS DEL MINI REPRODUCTOR
-if (miniPlayBtn) {
-  miniPlayBtn.addEventListener('click', (e) => {
-    e.stopPropagation(); // Evita que se abra el reproductor completo al tocar play
-    togglePlay();
-  });
-}
-if (miniNextBtn) {
-  miniNextBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    nextTrack();
-  });
-}
-if (miniInfoBtn) {
-  miniInfoBtn.addEventListener('click', () => {
-    abrirReproductor(); // Abre el menú grande al tocar la info o la foto
-  });
-}
-if (miniCover) {
-  miniCover.addEventListener('click', () => {
-    abrirReproductor();
-  });
-}
+if (miniPlayBtn) miniPlayBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
+if (miniNextBtn) miniNextBtn.addEventListener('click', (e) => { e.stopPropagation(); nextTrack(); });
+if (miniInfoBtn) miniInfoBtn.addEventListener('click', abrirReproductor);
+if (miniCover) miniCover.addEventListener('click', abrirReproductor);
 
-// LÓGICA DEL FONDO
+// FONDO Y BLUR
 function applyBackground(imageSrc, blurAmount) {
   if (!customBg) return;
   customBg.style.backgroundImage = `url(${imageSrc})`;
@@ -359,11 +368,17 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
 
 // ARRANQUE
 document.addEventListener('DOMContentLoaded', () => {
+  // Cargar fondo
   const savedBg = localStorage.getItem('ymPlay_customBg');
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) {
     if (bgBlurSlider) bgBlurSlider.value = savedBlur;
     applyBackground(savedBg, savedBlur);
   }
+  
+  // Escanear música
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
+  
+  // Comprobar actualizaciones
+  checkForUpdates();
 });
