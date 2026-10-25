@@ -36,9 +36,14 @@
         </label>
       </li>
     </ul>
+    
+    <!-- CONTROLES DE APARIENCIA -->
     <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-      <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">Desenfoque de fondo:</label>
-      <input type="range" id="bgBlurSlider" min="0" max="20" value="0" step="1" style="width: 100%; accent-color: var(--accent);">
+      <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">Nitidez del fondo:</label>
+      <input type="range" id="bgBlurSlider" min="0" max="20" value="0" step="1" style="width: 100%; accent-color: var(--accent); margin-bottom: 15px;">
+      
+      <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">Transparencia de menús:</label>
+      <input type="range" id="uiOpacitySlider" min="0.2" max="1" value="0.85" step="0.05" style="width: 100%; accent-color: var(--accent);">
     </div>
   </div>
   <div id="menu-overlay" class="menu-overlay"></div>
@@ -69,8 +74,10 @@
         <div class="palette-dot" data-color="mono"></div>
       </div>
 
+      <!-- PESTAÑAS ACTUALIZADAS -->
       <div class="tabs-container" id="main-tabs">
         <button class="tab-btn-main active" data-view="songs">Canciones</button>
+        <button class="tab-btn-main" data-view="favorites">Favoritos</button>
         <button class="tab-btn-main" data-view="playlists">Playlists</button>
       </div>
 
@@ -79,7 +86,7 @@
           <button id="btnEscanear" class="small-update-btn">Actualizar Música</button>
         </div>
         <div class="playlist-section" style="flex: 1; overflow-y: auto;">
-          <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
+          <h3 id="listTitle" style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
           <ul class="playlist" id="playlist"></ul>
         </div>
       </div>
@@ -136,7 +143,13 @@
       </div>
 
       <div class="song-info">
-        <div class="song-title" id="songTitle">Selecciona una canción</div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+          <div class="song-title" id="songTitle">Selecciona una canción</div>
+          <!-- BOTÓN DE FAVORITO -->
+          <button id="favBtn" class="fav-btn" title="Favorito">
+            <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          </button>
+        </div>
         <div class="song-artist" id="songArtist">—</div>
       </div>
 
@@ -151,7 +164,6 @@
         <button class="ctrl-btn" id="nextBtn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
       </div>
 
-      <!-- NUEVOS CONTROLES: MODOS DE REPRODUCCIÓN -->
       <div class="playback-modes">
         <button id="modeNormal" class="mode-btn active" title="Normal">
           <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
@@ -187,7 +199,6 @@
             <div class="eq-band"><label>4kHz</label><input type="range" min="-12" max="12" value="0" data-freq="4000" /></div>
             <div class="eq-band"><label>14kHz</label><input type="range" min="-12" max="12" value="0" data-freq="14000" /></div>
           </div>
-          <!-- NUEVO BOTÓN PARA APAGAR EL ECUALIZADOR -->
           <button id="eqResetBtn" class="btn-reset-eq">Apagar / Restablecer Ecualizador</button>
         </div>
       </div>
