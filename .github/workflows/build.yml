@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 20
 
+      # Forzamos la instalación para evitar conflictos de versiones
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -30,12 +31,12 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync
 
-      - name: Add all required permissions to Manifest
+      - name: Add permissions and MediaSession Service to Manifest
         run: |
-          # 1. Inyectar permisos de audio, notificaciones y servicio en primer plano
+          # 1. Inyectar permisos de audio, notificaciones y primer plano
           sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
           
-          # 2. Inyectar el servicio de MediaSession (VITAL PARA QUE NO SE CIERRE EN ANDROID 13+)
+          # 2. Inyectar el servicio en primer plano del reproductor (Evita el cierre de la app)
           sed -i 's/<\/application>/<service android:name="com.jofr.capacitor.mediasession.MediaSessionService" android:foregroundServiceType="mediaPlayback" \/><\/application>/' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
