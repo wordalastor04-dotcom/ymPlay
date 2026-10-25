@@ -70,30 +70,61 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// 1. NOTIFICACIÓN MULTIMEDIA (API WEB - NO CIERRA LA APP)
+// 1. MEMORIA Y CACHÉ DE MÚSICA (No volver a escanear siempre)
+// ============================================================
+function loadCachedTracks() {
+  const cached = localStorage.getItem('ymPlay_tracks_cache');
+  if (cached) {
+    tracks = JSON.parse(cached);
+    if (tracks.length > 0) {
+      sortTracks('newest'); // Esto ya renderiza la lista
+    }
+  }
+}
+
+function saveTracksCache() {
+  try {
+    localStorage.setItem('ymPlay_tracks_cache', JSON.stringify(tracks));
+  } catch (e) {
+    console.warn("No se pudo guardar la caché de canciones (posible límite de memoria).");
+  }
+}
+
+// ============================================================
+// 2. LÓGICA DE COLA DE REPRODUCCIÓN (Bucle en Playlists)
+// ============================================================
+function getActiveQueue() {
+  // Si estamos reproduciendo desde una playlist, la cola es esa playlist
+  if (currentPlaylistId !== null) {
+    const pl = playlists.find(p => p.id === currentPlaylistId);
+    if (pl) {
+      return tracks.filter(t => pl.songs.includes(t.url));
+    }
+  }
+  // Si no, la cola es toda la música
+  return tracks;
+}
+
+// ============================================================
+// 3. NOTIFICACIÓN MULTIMEDIA (API WEB)
 // ============================================================
 function setupMediaSession(track, coverUrl) {
   if ('mediaSession' in navigator) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.name,
-        artist: track.artist,
-        album: 'ymPlay',
+        title: track.name, artist: track.artist, album: 'ymPlay',
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
-      
       navigator.mediaSession.setActionHandler('play', () => playAudio());
       navigator.mediaSession.setActionHandler('pause', () => audio.pause());
       navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-    } catch (e) {
-      console.warn("Error en MediaSession:", e);
-    }
+    } catch (e) {}
   }
 }
 
 // ============================================================
-// 2. ACTUALIZACIÓN Y VISTAS
+// 4. ACTUALIZACIÓN Y VISTAS
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -189,6 +220,52 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 });
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
+// ============================================================
+// 5. ESCANEO DE MÚSICA (Con caché)
+// ============================================================
+async function escanearMusicaNativa() {
+  const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
+  if (!window.Capacitor || !MediaStorePlugin) return;
+  
+  try {
+    // Si ya hay caché, no mostramos el mensaje de "Buscando" para que sea instantáneo
+    if (tracks.length === 0) {
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    }
+    
+    await MediaStorePlugin.requestPermissions({ types: ['audio'] });
+    const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
+    const listaAudios = result.media || result.medias || [];
+    
+    if (listaAudios.length > 0) {
+      const newTracks = listaAudios.map(song => ({
+        name: song.title || song.name || 'Desconocido',
+        artist: song.artist || 'Artista desconocido',
+        url: song.url || song.uri || song.path,
+        cover: song.albumArt || song.albumArtUri || song.cover || '',
+        dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
+        duration: song.duration || song.durationMs || 0 
+      })).filter(t => {
+        if (!t.url) return false;
+        let dur = t.duration;
+        if (dur > 0 && dur < 1000) dur = dur * 1000; 
+        return dur >= 60000;
+      });
+
+      // Comparamos si hay canciones nuevas para no recargar la UI de golpe
+      if (newTracks.length !== tracks.length) {
+        tracks = newTracks;
+        saveTracksCache(); // Guardamos en memoria
+        sortTracks('newest');
+      }
+    } else if (tracks.length === 0) {
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
+    }
+  } catch (error) {
+    console.warn("Error al escanear en segundo plano", error);
+  }
+}
+
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -202,41 +279,6 @@ function renderPlaylist() {
   });
 }
 
-async function escanearMusicaNativa() {
-  const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
-  if (!window.Capacitor || !MediaStorePlugin) {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
-    return;
-  }
-  try {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Solicitando permiso de música...</li>';
-    await MediaStorePlugin.requestPermissions({ types: ['audio'] });
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
-    const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
-    const listaAudios = result.media || result.medias || [];
-    if (listaAudios.length > 0) {
-      tracks = listaAudios.map(song => ({
-        name: song.title || song.name || 'Desconocido',
-        artist: song.artist || 'Artista desconocido',
-        url: song.url || song.uri || song.path,
-        cover: song.albumArt || song.albumArtUri || song.cover || '',
-        dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-        duration: song.duration || song.durationMs || 0 
-      })).filter(t => {
-        if (!t.url) return false;
-        let dur = t.duration;
-        if (dur > 0 && dur < 1000) dur = dur * 1000; 
-        return dur >= 60000;
-      });
-      sortTracks('newest');
-    } else {
-      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
-    }
-  } catch (error) {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos en Ajustes.</li>';
-  }
-}
-
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
   if (criteria === 'newest') tracks.sort((a, b) => b.dateAdded - a.dateAdded);
@@ -247,10 +289,13 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
+// ============================================================
+// 6. REPRODUCTOR (Con la lógica de la cola)
+// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
-function cargarCancion(index) {
+function cargarCancion(index, startTime = 0) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
   const track = tracks[index];
@@ -258,6 +303,13 @@ function cargarCancion(index) {
   
   audio.src = playableUrl;
   
+  if (startTime > 0) {
+    audio.addEventListener('loadedmetadata', function onMetadata() {
+      audio.currentTime = startTime;
+      audio.removeEventListener('loadedmetadata', onMetadata);
+    });
+  }
+
   if(songTitle) songTitle.textContent = track.name;
   if(songArtist) songArtist.textContent = track.artist;
   if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
@@ -272,7 +324,7 @@ function cargarCancion(index) {
   }
 
   setupMediaSession(track, coverUrl);
-  resetProgress();
+  if(startTime === 0) resetProgress();
   playAudio();
 }
 
@@ -283,9 +335,38 @@ function playAudio() {
 }
 
 function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
-function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
-function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
 
+function prevTrack() { 
+  const queue = getActiveQueue();
+  if (queue.length === 0) return;
+  
+  const currentUrl = tracks[currentIndex]?.url;
+  let qIndex = queue.findIndex(t => t.url === currentUrl);
+  
+  if (qIndex === -1) qIndex = 0; 
+  const prevQIndex = (qIndex - 1 + queue.length) % queue.length; // Lógica de bucle inverso
+  
+  const prevTrackObj = queue[prevQIndex];
+  const realIndex = tracks.findIndex(t => t.url === prevTrackObj.url);
+  if (realIndex !== -1) cargarCancion(realIndex);
+}
+
+function nextTrack() { 
+  const queue = getActiveQueue();
+  if (queue.length === 0) return;
+  
+  const currentUrl = tracks[currentIndex]?.url;
+  let qIndex = queue.findIndex(t => t.url === currentUrl);
+  
+  if (qIndex === -1) qIndex = -1; 
+  const nextQIndex = (qIndex + 1) % queue.length; // Lógica de bucle
+  
+  const nextTrackObj = queue[nextQIndex];
+  const realIndex = tracks.findIndex(t => t.url === nextTrackObj.url);
+  if (realIndex !== -1) cargarCancion(realIndex);
+}
+
+// Eventos de audio
 audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
@@ -311,6 +392,9 @@ if (progressBar) {
   });
 }
 
+// ============================================================
+// 7. ECUALIZADOR, FONDO Y TEMA
+// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
@@ -375,22 +459,26 @@ function setupBackButton() {
   }
 }
 
+// ============================================================
+// 8. ARRANQUE (Carga instantánea de caché)
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   
+  // 1. Cargar canciones desde la memoria (instantáneo)
+  loadCachedTracks();
+
+  // 2. En segundo plano, buscar canciones nuevas y actualizar
+  setTimeout(() => { escanearMusicaNativa(); }, 1000);
+
   if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
-    window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(result => {
-      console.log("Permiso de notificaciones:", result.display);
-    });
-  } else if ('Notification' in window) {
-    Notification.requestPermission();
+    window.Capacitor.Plugins.LocalNotifications.requestPermissions();
   }
 
   const savedBg = localStorage.getItem('ymPlay_customBg'); 
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) { if (bgBlurSlider) bgBlurSlider.value = savedBlur; applyBackground(savedBg, savedBlur); }
   
-  setTimeout(() => { escanearMusicaNativa(); }, 1000);
   checkForUpdates();
   setupBackButton();
 });
