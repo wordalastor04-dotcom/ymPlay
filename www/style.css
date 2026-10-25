@@ -64,16 +64,17 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* ===== FONDO PERSONALIZADO DE LA APP ===== */
+/* ===== FONDO PERSONALIZADO DE LA APP (AQUÍ ESTÁ EL ARREGLO) ===== */
 #custom-bg {
   position: fixed;
   inset: 0;
   z-index: -2;
   background-size: cover;
   background-position: center;
-  opacity: 0.2;
+  opacity: 0.7; /* Subimos la opacidad de 0.2 a 0.7 para que se vea bien */
   display: none;
   pointer-events: none;
+  filter: blur(2px); /* Un desenfoque ligero para que el texto resalte sin perder la imagen */
 }
 body.has-custom-bg #custom-bg { display: block; }
 
@@ -83,13 +84,25 @@ body.has-custom-bg #custom-bg { display: block; }
   max-width: 480px;
   height: 100%;
   background: var(--bg-card);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: blur(15px); /* Redujimos el desenfoque de 25px a 15px */
+  -webkit-backdrop-filter: blur(15px);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
   transition: background 0.3s ease;
+}
+
+/* Cuando hay fondo personalizado, hacemos el fondo de la app más transparente */
+body.has-custom-bg .player-app {
+  background: rgba(22, 30, 46, 0.6); /* Fondo oscuro semitransparente */
+  backdrop-filter: blur(10px); 
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Lo mismo para el tema claro */
+body.has-custom-bg[data-theme="light"] .player-app {
+  background: rgba(255, 255, 255, 0.6);
 }
 
 @media (min-width: 500px) {
@@ -213,10 +226,8 @@ body.has-custom-bg #custom-bg { display: block; }
   color: var(--text-primary); border-radius: 30px; font-size: 13px; cursor: pointer;
 }
 
-/* ESTO ES LO QUE OCULTA EL TEXTO FEO DE "SELECCIONAR ARCHIVO" */
-.file-label input, .bg-label input {
-  display: none;
-}
+/* Ocultar inputs de archivo */
+.file-label input, .bg-label input { display: none; }
 
 /* =========================================
    REPRODUCTOR (FOTO EN GRANDE)
