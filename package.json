@@ -3,15 +3,14 @@
   "version": "1.0.0",
   "description": "Mi reproductor de musica",
   "dependencies": {
-    "@capacitor/android": "^8.0.0",
-    "@capacitor/app": "^8.0.0",
-    "@capacitor/core": "^8.0.0",
-    "@capacitor/local-notifications": "^8.0.0",
-    "capacitor-plugin-playlist": "^0.10.8",
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/local-notifications": "^6.0.0",
     "@odion-cloud/capacitor-mediastore": "^1.0.21"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.0.0",
+    "@capacitor/cli": "^6.0.0",
     "@capacitor/assets": "^3.0.5"
   }
 }
