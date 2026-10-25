@@ -1,5 +1,4 @@
 const audio = new Audio();
-// Optimizaciones clave para evitar cortes:
 audio.preload = "auto"; 
 audio.autoplay = false;
 
@@ -11,10 +10,10 @@ let currentPlaylistId = null;
 let audioCtx = null;
 let sourceNode = null;
 let eqFilters = [];
-let isEqActive = false; // Bandera para saber si el ecualizador está consumiendo recursos
+let isEqActive = false; 
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-const CURRENT_APP_VERSION = "1.1.5"; 
+const CURRENT_APP_VERSION = "1.1.2"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -96,7 +95,7 @@ const cancelCtxPlaylist = $('cancelCtxPlaylist');
 
 let selectedTrackObj = null;
 let pressTimer;
-let wakeLock = null; // Variable para el Wake Lock
+let wakeLock = null;
 
 // ============================================================
 // 1. SISTEMA ANTI-CORTES (WAKE LOCK)
@@ -105,13 +104,8 @@ async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => {
-        console.log('Wake Lock liberado');
-      });
     }
-  } catch (err) {
-    console.warn(`Wake Lock error: ${err.name}, ${err.message}`);
-  }
+  } catch (err) {}
 }
 
 function releaseWakeLock() {
@@ -123,7 +117,7 @@ function releaseWakeLock() {
 
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible' && !audio.paused) {
-    await requestWakeLock(); // Volver a pedir permiso al volver a la app
+    await requestWakeLock(); 
   }
 });
 
@@ -345,7 +339,7 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
 // ============================================================
-// 5. RENDERIZAR Y ESCANEAR
+// 5. RENDERIZAR Y ESCANEAR (SIN FILTRO DE DURACIÓN)
 // ============================================================
 function startPress(track) { pressTimer = setTimeout(() => { showSelectionMenu(track); }, 600); }
 function cancelPress() { clearTimeout(pressTimer); }
@@ -370,25 +364,40 @@ function renderPlaylist() {
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) return;
+  
   try {
-    if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>'; }
+    if (tracks.length === 0) {
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    }
+    
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
     const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
+    
     if (listaAudios.length > 0) {
       const newTracks = listaAudios.map(song => ({
-        name: song.title || song.name || 'Desconocido', artist: song.artist || 'Artista desconocido',
-        url: song.url || song.uri || song.path, cover: song.albumArt || song.albumArtUri || song.cover || '',
+        name: song.title || song.name || 'Desconocido',
+        artist: song.artist || 'Artista desconocido',
+        url: song.url || song.uri || song.path,
+        cover: song.albumArt || song.albumArtUri || song.cover || '',
         dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-        duration: song.duration || song.durationMs || 0, hidden: false
-      })).filter(t => { if (!t.url) return false; let dur = t.duration; if (dur > 0 && dur < 1000) dur = dur * 1000; return dur >= 60000; });
+        duration: song.duration || song.durationMs || 0,
+        hidden: false
+      })).filter(t => {
+        // AQUI ESTÁ LA CORRECCIÓN: Solo comprobamos que tenga URL, sin importar la duración
+        return t.url; 
+      });
 
-      if (newTracks.length !== tracks.length) {
+      if (newTracks.length > 0) {
         const hiddenUrls = tracks.filter(t => t.hidden).map(t => t.url);
         tracks = newTracks.map(t => ({ ...t, hidden: hiddenUrls.includes(t.url) }));
         saveTracksCache(); sortTracks('newest'); restaurarSesion();
+      } else if (tracks.length === 0) { 
+        if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música válida.</li>'; 
       }
-    } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; }
+    } else if (tracks.length === 0) { 
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; 
+    }
   } catch (error) {}
 }
 
@@ -497,10 +506,7 @@ audio.addEventListener('play', () => {
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
   
-  // ANTI-CORTES: Bloquear pantalla para que no se duerma el CPU
-  requestWakeLock();
-  
-  // ANTI-CORTES: El ecualizador NO se conecta a menos que el usuario lo active
+  requestWakeLock(); 
   if (isEqActive) setupAudioContext(); 
   
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
@@ -510,8 +516,6 @@ audio.addEventListener('pause', () => {
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-  
-  // Liberar el bloqueo si el usuario pausa
   releaseWakeLock();
 });
 audio.addEventListener('ended', nextTrack);
@@ -528,19 +532,19 @@ if (progressBar) {
 // 7. ECUALIZADOR (Solo se activa si el usuario lo toca)
 // ============================================================
 function setupAudioContext() {
-  if (sourceNode) return; // Ya está inicializado
+  if (sourceNode) return; 
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     sourceNode = audioCtx.createMediaElementSource(audio);
     eqFilters = EQ_FREQS.map(freq => { const filter = audioCtx.createBiquadFilter(); filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0; return filter; });
     let prev = sourceNode; eqFilters.forEach(f => { prev.connect(f); prev = f; }); prev.connect(audioCtx.destination);
-    isEqActive = true; // Marcamos como activo
+    isEqActive = true; 
   } catch (e) {}
 }
 
 document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
   slider.addEventListener('input', () => { 
-    setupAudioContext(); // Conectar si no lo está al mover el deslizador
+    setupAudioContext(); 
     if (eqFilters[i]) eqFilters[i].gain.value = parseFloat(slider.value); 
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); 
   });
