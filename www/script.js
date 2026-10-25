@@ -15,8 +15,12 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 // 2. REFERENCIAS DOM
 // ============================================================
 const $ = id => document.getElementById(id);
+
+// Pantallas
 const screenPlaylist = $('screen-playlist');
 const screenPlayer = $('screen-player');
+
+// Lista y reproductor
 const playlistEl = $('playlist');
 const trackCount = $('trackCount');
 const btnEscanear = $('btnEscanear');
@@ -34,6 +38,7 @@ const coverImg = $('coverImg');
 const coverBadge = $('coverBadge');
 const backToListBtn = $('backToListBtn');
 
+// Menú lateral
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
 const menuOverlay = $('menu-overlay');
@@ -43,7 +48,7 @@ const sortOldestBtn = $('sortOldestBtn');
 const sortTitleBtn = $('sortTitleBtn');
 
 // ============================================================
-// 3. ESCANEO NATIVO DE MÚSICA
+// 3. ESCANEO NATIVO DE MÚSICA (MediaStore)
 // ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
@@ -55,8 +60,11 @@ async function escanearMusicaNativa() {
 
   try {
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    
+    // Pedir permisos
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
 
+    // Obtener archivos
     const result = await MediaStorePlugin.getMediasByType({ 
       mediaType: 'audio', sortBy: 'TITLE', includeExternal: true
     });
@@ -74,6 +82,7 @@ async function escanearMusicaNativa() {
         };
       }).filter(t => t.url);
       
+      // Ordenar por más recientes
       sortTracks('newest');
     } else {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
@@ -85,7 +94,7 @@ async function escanearMusicaNativa() {
 }
 
 // ============================================================
-// 4. RENDERIZAR LISTA
+// 4. RENDERIZAR LISTA DE REPRODUCCIÓN
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
@@ -144,7 +153,7 @@ function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverla
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
 // ============================================================
-// 6. REPRODUCTOR Y NOTIFICACIÓN (PLUGIN NATIVO)
+// 6. REPRODUCTOR Y MEDIA SESSION (Notificación)
 // ============================================================
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
@@ -167,7 +176,7 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  // Llamar a la configuración nativa del panel de notificaciones
+  // Configurar la notificación nativa
   setupNativeMediaSession(track, coverUrl);
 
   resetProgress();
@@ -179,7 +188,7 @@ async function setupNativeMediaSession(track, coverUrl) {
   
   if (MediaSessionPlugin) {
     try {
-      // Enviar metadatos a Android
+      // 1. Metadatos (Título, Artista, Portada)
       await MediaSessionPlugin.setMetadata({
         title: track.name,
         artist: track.artist,
@@ -187,11 +196,14 @@ async function setupNativeMediaSession(track, coverUrl) {
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
 
-      // Escuchar los botones del panel del celular
+      // 2. Botones de la notificación
       await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
       await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
       await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
       await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
+      
+      // 3. Indicar estado de reproducción
+      await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
       
     } catch (e) {
       console.warn("Error en MediaSession nativo:", e);
@@ -218,8 +230,24 @@ audio.addEventListener('timeupdate', () => {
   if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
   if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
 });
-audio.addEventListener('play', () => { if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; setupAudioContext(); });
-audio.addEventListener('pause', () => { if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; });
+
+audio.addEventListener('play', () => { 
+  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
+  setupAudioContext();
+  // Actualizar notificación a "Reproduciendo"
+  if (window.Capacitor?.Plugins?.MediaSession) {
+    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'playing' });
+  }
+});
+
+audio.addEventListener('pause', () => { 
+  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+  // Actualizar notificación a "Pausado"
+  if (window.Capacitor?.Plugins?.MediaSession) {
+    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'paused' });
+  }
+});
+
 audio.addEventListener('ended', nextTrack);
 
 if (progressBar) {
@@ -267,7 +295,7 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
 });
 
 // ============================================================
-// 8. NAVEGACIÓN Y UTILIDADES
+// 8. NAVEGACIÓN, TEMAS Y UTILIDADES
 // ============================================================
 function abrirReproductor() { if(screenPlaylist) screenPlaylist.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenPlaylist) screenPlaylist.style.display = 'flex'; renderPlaylist(); }
@@ -295,6 +323,7 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
+// Cambio de tema (Oscuro/Claro)
 const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) {
   themeBtn.addEventListener('click', () => {
@@ -303,6 +332,7 @@ if (themeBtn) {
   });
 }
 
+// Cambio de colores (Paleta)
 document.querySelectorAll('.palette-dot').forEach(dot => {
   dot.addEventListener('click', () => {
     document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
@@ -311,6 +341,7 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
+// Arrancar la app y buscar música
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
 });
