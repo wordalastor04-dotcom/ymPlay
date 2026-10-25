@@ -16,7 +16,7 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 // Variable para los modos: 'normal', 'repeat', 'shuffle'
 let playbackMode = 'normal'; 
 
-const CURRENT_APP_VERSION = "1.1.3"; 
+const CURRENT_APP_VERSION = "1.1.4"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -426,9 +426,28 @@ function cargarCancion(index, startTime = 0) {
     if (coverUrl) { miniCover.src = coverUrl; miniCover.style.display = 'block'; } else { miniCover.style.display = 'none'; }
   }
 
+  // ACTUALIZACIÓN CLAVE: Actualizar el resaltado de la lista en tiempo real
+  updatePlaylistHighlight();
+
   setupMediaSession(track, coverUrl);
   if(startTime === 0) resetProgress();
   playAudio();
+}
+
+function updatePlaylistHighlight() {
+  // Actualizar lista global
+  if (playlistEl) {
+      playlistEl.querySelectorAll('li').forEach((li, i) => {
+        li.classList.toggle('active', i === currentIndex);
+      });
+  }
+  // Actualizar lista de playlist detallada si está visible
+  if (playlistDetailList && currentPlaylistId !== null) {
+      playlistDetailList.querySelectorAll('li').forEach((li) => {
+          const idx = parseInt(li.dataset.index);
+          li.classList.toggle('active', idx === currentIndex);
+      });
+  }
 }
 
 function playAudio() {
@@ -455,12 +474,9 @@ function prevTrack() {
 function nextTrack() { 
   const queue = getActiveQueue(); if (queue.length === 0) return;
   
-  // Si es modo aleatorio
   if (playbackMode === 'shuffle') {
     let randomIndex = Math.floor(Math.random() * queue.length);
-    // Si solo hay una canción, se queda en esa
     if (queue.length > 1) {
-        // Evitar que suene la misma canción seguida
         while (queue[randomIndex].url === tracks[currentIndex]?.url) {
             randomIndex = Math.floor(Math.random() * queue.length);
         }
@@ -470,7 +486,6 @@ function nextTrack() {
     return;
   }
 
-  // Modo normal
   const currentUrl = tracks[currentIndex]?.url; let qIndex = queue.findIndex(t => t.url === currentUrl);
   if (qIndex === -1) qIndex = -1; 
   const nextQIndex = (qIndex + 1) % queue.length;
@@ -516,7 +531,6 @@ audio.addEventListener('pause', () => {
   releaseWakeLock();
 });
 
-// AQUI SE CONTROL EL BUCLE DE UNA SOLA CANCIÓN
 audio.addEventListener('ended', () => {
     if (playbackMode === 'repeat') {
         audio.currentTime = 0;
@@ -564,26 +578,33 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
 });
 
-// LÓGICA PARA APAGAR/RESETear EL ECUALIZADOR
 document.getElementById('eqResetBtn')?.addEventListener('click', () => {
-    // Poner todos los sliders en 0 y desactivar los presets visualmente
     document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
         slider.value = 0;
         if (eqFilters[i]) eqFilters[i].gain.value = 0;
     });
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.preset-btn[data-preset="flat"]').classList.add('active');
-    
-    // Si quieres apagar el ecualizador de verdad para ahorrar recursos, 
-    // desconectamos el nodo (pero el sonido seguirá saliendo por el canal principal)
     isEqActive = false;
 });
 
 // ============================================================
-// 9. NAVEGACIÓN Y FONDO
+// 9. NAVEGACIÓN Y FONDO (AQUÍ ESTÁ EL ARREGLO)
 // ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
-function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
+
+function volverALista() { 
+  if(screenPlayer) screenPlayer.style.display = 'none'; 
+  if(screenMain) screenMain.style.display = 'flex'; 
+  
+  // ARREGLO: Refrescar la vista correcta dependiendo de dónde esté el usuario
+  if (currentPlaylistId !== null) {
+    renderPlaylistDetail();
+  } else {
+    renderPlaylist();
+  }
+}
+
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; }
 function formatTime(sec) { if (isNaN(sec) || !isFinite(sec)) return '0:00'; return `${Math.floor(sec/60)}:${Math.floor(sec%60).toString().padStart(2, '0')}`; }
 
