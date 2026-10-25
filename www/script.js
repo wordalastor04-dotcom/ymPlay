@@ -70,15 +70,14 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// 1. NOTIFICACIÓN MULTIMEDIA NATIVA (FORK CAPACITOR 6)
+// 1. NOTIFICACIÓN MULTIMEDIA NATIVA (Blindada)
 // ============================================================
 async function setupMediaSession(track, coverUrl) {
-  // El fork de Capacitor 6 usa el nombre estándar del plugin
+  // Usar el plugin oficial
   const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
 
   if (MediaSessionPlugin) {
     try {
-      // A. Enviar metadatos (Título, Artista, Portada)
       await MediaSessionPlugin.setMetadata({
         title: track.name,
         artist: track.artist,
@@ -86,20 +85,25 @@ async function setupMediaSession(track, coverUrl) {
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
       
-      // B. Escuchar los botones de la notificación
       await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
       await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
       await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
       await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
       
-      // C. Decirle a Android que muestre la notificación
       await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
       
     } catch (e) {
-      console.warn("Error en plugin nativo de notificación:", e);
+      console.warn("Fallo el plugin nativo, usando Web API:", e);
+      setupWebMediaSession(track, coverUrl);
     }
-  } else if ('mediaSession' in navigator) {
-    // Respaldo web
+  } else {
+    // Si el plugin no existe, usar la API del navegador (no cierra la app)
+    setupWebMediaSession(track, coverUrl);
+  }
+}
+
+function setupWebMediaSession(track, coverUrl) {
+  if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.name, artist: track.artist, album: 'ymPlay',
       artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
@@ -112,7 +116,7 @@ async function setupMediaSession(track, coverUrl) {
 }
 
 // ============================================================
-// 2. ACTUALIZACIÓN
+// 2. ACTUALIZACIÓN Y VISTAS
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -134,9 +138,6 @@ async function checkForUpdates() {
 }
 if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
-// ============================================================
-// 3. VISTAS Y PLAYLISTS
-// ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
   if (viewName === 'songs') {
@@ -212,7 +213,7 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
 // ============================================================
-// 4. RENDERIZAR LISTA Y ESCANEAR
+// 3. RENDERIZAR Y ESCANEAR MÚSICA
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
@@ -273,7 +274,7 @@ function sortTracks(criteria) {
 }
 
 // ============================================================
-// 5. REPRODUCTOR Y LÓGICA DE AUDIO
+// 4. REPRODUCTOR Y LÓGICA DE AUDIO
 // ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
@@ -344,7 +345,7 @@ if (progressBar) {
 }
 
 // ============================================================
-// 6. ECUALIZADOR, TEMA Y FONDO
+// 5. ECUALIZADOR, TEMA, FONDO Y BOTÓN ATRÁS
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
