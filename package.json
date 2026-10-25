@@ -9,6 +9,7 @@
     "@odion-cloud/capacitor-mediastore": "^1.0.21"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.0.0"
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/assets": "^3.0.5"
   }
 }
