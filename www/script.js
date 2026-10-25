@@ -10,7 +10,7 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-const CURRENT_APP_VERSION = "1.0.6"; 
+const CURRENT_APP_VERSION = "1.0.7"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -70,9 +70,10 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// 1. NOTIFICACIÓN MULTIMEDIA NATIVA (MediaStyle Android)
+// 1. NOTIFICACIÓN MULTIMEDIA NATIVA (FORK CAPACITOR 6)
 // ============================================================
 async function setupMediaSession(track, coverUrl) {
+  // El fork de Capacitor 6 usa el nombre estándar del plugin
   const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
 
   if (MediaSessionPlugin) {
@@ -98,7 +99,7 @@ async function setupMediaSession(track, coverUrl) {
       console.warn("Error en plugin nativo de notificación:", e);
     }
   } else if ('mediaSession' in navigator) {
-    // Respaldo por si se prueba en navegador web
+    // Respaldo web
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.name, artist: track.artist, album: 'ymPlay',
       artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
@@ -134,7 +135,7 @@ async function checkForUpdates() {
 if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
 // ============================================================
-// 3. CONTROL DE VISTAS Y PLAYLISTS
+// 3. VISTAS Y PLAYLISTS
 // ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
@@ -211,7 +212,7 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
 // ============================================================
-// 4. RENDERIZAR Y ESCANEAR MÚSICA
+// 4. RENDERIZAR LISTA Y ESCANEAR
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
@@ -272,7 +273,7 @@ function sortTracks(criteria) {
 }
 
 // ============================================================
-// 5. REPRODUCTOR (Conectar con Notificación)
+// 5. REPRODUCTOR Y LÓGICA DE AUDIO
 // ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
@@ -298,9 +299,7 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  // Llamamos a la notificación nativa
   setupMediaSession(track, coverUrl);
-
   resetProgress();
   playAudio();
 }
@@ -315,7 +314,6 @@ function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
 function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
 
-// Eventos para mantener la notificación sincronizada
 audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
@@ -346,7 +344,7 @@ if (progressBar) {
 }
 
 // ============================================================
-// 6. ECUALIZADOR, FONDO, TEMA Y NAVEGACIÓN
+// 6. ECUALIZADOR, TEMA Y FONDO
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
