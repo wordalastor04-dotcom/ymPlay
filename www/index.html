@@ -10,6 +10,13 @@
 
   <div id="custom-bg"></div>
 
+  <!-- BANNER DE ACTUALIZACIÓN (Oculto por defecto) -->
+  <div id="update-banner" class="update-banner">
+    <span>✨ ¡Nueva actualización disponible!</span>
+    <button id="downloadUpdateBtn">Descargar</button>
+    <button id="closeUpdateBtn" class="close-update">✕</button>
+  </div>
+
   <!-- MENÚ LATERAL -->
   <div id="side-menu" class="side-menu">
     <div class="menu-header">
@@ -23,7 +30,6 @@
       <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
       <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
       
-      <!-- Botón de Fondo movido al menú -->
       <li>
         <label class="menu-btn" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
           🖼️ Cambiar Fondo
@@ -60,7 +66,6 @@
         </div>
       </div>
 
-      <!-- Paleta de colores -->
       <div class="palette-switcher">
         <div class="palette-dot active" data-color="ocean" title="Océano"></div>
         <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
@@ -68,7 +73,6 @@
         <div class="palette-dot" data-color="mono" title="Monocromo"></div>
       </div>
 
-      <!-- Botón de Actualizar Música (Sin emoji) -->
       <div style="display: flex; justify-content: center; margin-bottom: 15px;">
         <button id="btnEscanear" class="small-update-btn">
           Actualizar Música
@@ -80,7 +84,6 @@
         <ul class="playlist" id="playlist"></ul>
       </div>
 
-      <!-- MINI REPRODUCTOR (Oculto por defecto) -->
       <div id="mini-player" class="mini-player" style="display: none;">
         <img id="miniCover" src="" alt="Portada" class="mini-cover">
         <div class="mini-info" id="miniInfoBtn">
@@ -88,13 +91,8 @@
           <span id="miniArtist">Artista</span>
         </div>
         <div class="mini-controls">
-          <button id="miniPlayBtn" class="mini-btn">
-            <!-- Icono Play inicial -->
-            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          </button>
-          <button id="miniNextBtn" class="mini-btn">
-            <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
-          </button>
+          <button id="miniPlayBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+          <button id="miniNextBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
         </div>
       </div>
 
@@ -168,4 +166,4 @@
 
   <script src="script.js"></script>
 </body>
-</html>
+            </html>
