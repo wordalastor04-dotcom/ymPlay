@@ -4,16 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>ymPlay</title>
-  
-  <!-- ENLACE AL CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Fondo personalizado -->
   <div id="custom-bg"></div>
 
-  <!-- MENÚ LATERAL (OCULTO POR DEFECTO) -->
+  <!-- MENÚ LATERAL -->
   <div id="side-menu" class="side-menu">
     <div class="menu-header">
       <h2>Opciones</h2>
@@ -27,15 +24,13 @@
       <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
     </ul>
   </div>
-  <!-- Capa oscura detrás del menú -->
   <div id="menu-overlay" class="menu-overlay"></div>
 
   <div class="player-app">
     
-    <!-- PANTALLA 1: LISTA DE MÚSICA -->
+    <!-- PANTALLA 1: LISTA -->
     <div id="screen-playlist" style="display: flex; flex-direction: column; height: 100%;">
       
-      <!-- BARRA SUPERIOR CON MENÚ HAMBURGUESA -->
       <div class="top-bar">
         <div style="display: flex; align-items: center; gap: 10px;">
           <button class="icon-btn" id="menuBtn">
@@ -44,13 +39,14 @@
           <h1>ymPlay</h1>
         </div>
         <div class="top-actions">
+          <!-- BOTÓN DEL TEMA -->
           <button class="icon-btn" id="themeToggle" title="Cambiar modo">
             <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
           </button>
         </div>
       </div>
 
-      <!-- SELECTOR DE PALETA -->
+      <!-- BOTONES DE COLORES -->
       <div class="palette-switcher">
         <div class="palette-dot active" data-color="ocean" title="Océano"></div>
         <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
@@ -58,15 +54,11 @@
         <div class="palette-dot" data-color="mono" title="Monocromo"></div>
       </div>
 
-      <!-- LISTA DE REPRODUCCIÓN -->
       <div class="playlist-section" style="flex: 1; overflow-y: auto;">
-        <h3 style="padding: 0 10px;">Canciones en tu teléfono <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
-        <ul class="playlist" id="playlist">
-          <li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>
-        </ul>
+        <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
+        <ul class="playlist" id="playlist"></ul>
       </div>
 
-      <!-- ACCIONES INFERIORES -->
       <div class="bottom-actions" style="margin-top: auto; padding-top: 10px;">
         <label class="file-label" id="btnEscanear">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>
@@ -82,7 +74,6 @@
 
     <!-- PANTALLA 2: REPRODUCTOR -->
     <div id="screen-player" style="display: none; flex-direction: column; height: 100%;">
-      
       <div class="top-bar" style="justify-content: flex-start; margin-bottom: 10px;">
         <button class="icon-btn" id="backToListBtn" style="margin-right: 10px;">
           <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z"/></svg>
