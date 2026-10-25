@@ -52,20 +52,17 @@ const sortNewestBtn = $('sortNewestBtn');
 const sortOldestBtn = $('sortOldestBtn');
 const sortTitleBtn = $('sortTitleBtn');
 
-// BANNER DE ACTUALIZACIÓN
 const updateBanner = $('update-banner');
 const downloadUpdateBtn = $('downloadUpdateBtn');
 const closeUpdateBtn = $('closeUpdateBtn');
 
+// COMPROBAR ACTUALIZACIONES
 async function checkForUpdates() {
   try {
     const response = await fetch(UPDATE_JSON_URL);
     const data = await response.json();
-    
-    // Si la versión en internet es diferente a la de esta app
     if (data.version !== CURRENT_APP_VERSION) {
       if (updateBanner) {
-        // Le ponemos el enlace de descarga al botón
         downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
         updateBanner.classList.add('show');
       }
@@ -76,12 +73,10 @@ async function checkForUpdates() {
 }
 
 if (closeUpdateBtn) {
-  closeUpdateBtn.onclick = () => {
-    updateBanner.classList.remove('show');
-  };
+  closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 }
 
-// ESCANEO
+// ESCANEO CON FILTRO DE DURACIÓN (Mayor a 1 minuto)
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
@@ -91,16 +86,33 @@ async function escanearMusicaNativa() {
   try {
     if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
+    
     const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
+    
     if (listaAudios.length > 0) {
-      tracks = listaAudios.map(song => ({
-        name: song.title || song.name || 'Desconocido',
-        artist: song.artist || 'Artista desconocido',
-        url: song.url || song.uri || song.path,
-        cover: song.albumArt || song.albumArtUri || song.cover || '',
-        dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0
-      })).filter(t => t.url);
+      tracks = listaAudios.map(song => {
+        return {
+          name: song.title || song.name || 'Desconocido',
+          artist: song.artist || 'Artista desconocido',
+          url: song.url || song.uri || song.path,
+          cover: song.albumArt || song.albumArtUri || song.cover || '',
+          dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
+          // Guardamos la duración que nos da Android (suele venir en milisegundos)
+          duration: song.duration || song.durationMs || 0 
+        };
+      }).filter(t => {
+        // 1. Que tenga un enlace de audio válido
+        if (!t.url) return false;
+        
+        // 2. Filtro de duración: Mayor o igual a 60,000 ms (1 minuto)
+        // Si la duración viene en segundos (por si acaso), multiplicamos por 1000
+        let dur = t.duration;
+        if (dur > 0 && dur < 1000) dur = dur * 1000; 
+        
+        return dur >= 60000; // 60000 ms = 1 minuto
+      });
+      
       sortTracks('newest');
     } else {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
@@ -115,7 +127,7 @@ function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
   if (tracks.length === 0) {
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música</li>';
+    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música mayor a 1 minuto.</li>';
     return;
   }
   playlistEl.innerHTML = tracks.map((t, i) => {
@@ -368,7 +380,6 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
 
 // ARRANQUE
 document.addEventListener('DOMContentLoaded', () => {
-  // Cargar fondo
   const savedBg = localStorage.getItem('ymPlay_customBg');
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) {
@@ -376,9 +387,6 @@ document.addEventListener('DOMContentLoaded', () => {
     applyBackground(savedBg, savedBlur);
   }
   
-  // Escanear música
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
-  
-  // Comprobar actualizaciones
   checkForUpdates();
 });
