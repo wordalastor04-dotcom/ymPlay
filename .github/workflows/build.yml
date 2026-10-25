@@ -40,13 +40,22 @@ jobs:
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
 
-      - name: Sign APK with jarsigner
+      - name: Sign APK with apksigner
         run: |
-          jarsigner -keystore android/release.p12 \
-            -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            -signedjar android/app/build/outputs/apk/debug/app-debug-signed.apk \
-            android/app/build/outputs/apk/debug/app-debug.apk \
-            "${{ secrets.ANDROID_KEY_ALIAS }}"
+          # Buscar la carpeta de herramientas de Android
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          
+          # 1. Alinear el APK (obligatorio antes de firmar)
+          $BUILD_TOOLS_DIR/zipalign -v -p 4 android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/app-debug-aligned.apk
+          
+          # 2. Firmar con apksigner (aplica v1, v2 y v3 automáticamente)
+          $BUILD_TOOLS_DIR/apksigner sign --ks android/release.p12 \
+            --ks-type PKCS12 \
+            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            --ks-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --key-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --out android/app/build/outputs/apk/debug/app-debug-signed.apk \
+            android/app/build/outputs/apk/debug/app-debug-aligned.apk
 
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
