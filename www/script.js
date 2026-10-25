@@ -10,7 +10,7 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-const CURRENT_APP_VERSION = "1.0.7"; 
+const CURRENT_APP_VERSION = "1.0.9"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -70,48 +70,25 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// 1. NOTIFICACIÓN MULTIMEDIA NATIVA (Blindada)
+// 1. NOTIFICACIÓN MULTIMEDIA (API WEB - NO CIERRA LA APP)
 // ============================================================
-async function setupMediaSession(track, coverUrl) {
-  // Usar el plugin oficial
-  const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
-
-  if (MediaSessionPlugin) {
+function setupMediaSession(track, coverUrl) {
+  if ('mediaSession' in navigator) {
     try {
-      await MediaSessionPlugin.setMetadata({
+      navigator.mediaSession.metadata = new MediaMetadata({
         title: track.name,
         artist: track.artist,
         album: 'ymPlay',
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
       
-      await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
-      await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
-      await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
-      await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
-      
-      await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
-      
+      navigator.mediaSession.setActionHandler('play', () => playAudio());
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
+      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
     } catch (e) {
-      console.warn("Fallo el plugin nativo, usando Web API:", e);
-      setupWebMediaSession(track, coverUrl);
+      console.warn("Error en MediaSession:", e);
     }
-  } else {
-    // Si el plugin no existe, usar la API del navegador (no cierra la app)
-    setupWebMediaSession(track, coverUrl);
-  }
-}
-
-function setupWebMediaSession(track, coverUrl) {
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.name, artist: track.artist, album: 'ymPlay',
-      artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-    });
-    navigator.mediaSession.setActionHandler('play', () => playAudio());
-    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
-    navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
   }
 }
 
@@ -212,9 +189,6 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 });
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
-// ============================================================
-// 3. RENDERIZAR Y ESCANEAR MÚSICA
-// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -273,9 +247,6 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
-// ============================================================
-// 4. REPRODUCTOR Y LÓGICA DE AUDIO
-// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
@@ -324,15 +295,11 @@ audio.addEventListener('timeupdate', () => {
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
   setupAudioContext();
-  if (window.Capacitor?.Plugins?.MediaSession) {
-    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'playing' }).catch(()=>{});
-  }
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
 audio.addEventListener('pause', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
-  if (window.Capacitor?.Plugins?.MediaSession) {
-    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'paused' }).catch(()=>{});
-  }
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 });
 audio.addEventListener('ended', nextTrack);
 
@@ -344,9 +311,6 @@ if (progressBar) {
   });
 }
 
-// ============================================================
-// 5. ECUALIZADOR, TEMA, FONDO Y BOTÓN ATRÁS
-// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
