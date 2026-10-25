@@ -368,6 +368,7 @@ function playAudio() {
 function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 
 function prevTrack() { 
+  if (window.ymPrev && window.ymPrev()) return;
   const queue = getActiveQueue();
   if (queue.length === 0) return;
   const currentUrl = tracks[currentIndex]?.url;
@@ -379,6 +380,7 @@ function prevTrack() {
 }
 
 function nextTrack() { 
+  if (window.ymNext && window.ymNext()) return;
   const queue = getActiveQueue();
   if (queue.length === 0) return;
   const currentUrl = tracks[currentIndex]?.url;
@@ -406,7 +408,7 @@ audio.addEventListener('pause', () => {
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 });
-audio.addEventListener('ended', nextTrack);
+audio.addEventListener('ended', () => (window.onTrackEnded ? window.onTrackEnded() : nextTrack()));
 
 if (progressBar) {
   progressBar.addEventListener('click', e => {
@@ -480,6 +482,7 @@ function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
     AppPlugin.addListener('backButton', () => {
+      if (window.ymCloseSheet && window.ymCloseSheet()) return;
       if (sideMenu && sideMenu.classList.contains('open')) closeMenu();
       else if (modalSelectSongs.style.display === 'flex' || modalNewPlaylist.style.display === 'flex') { modalSelectSongs.style.display = 'none'; modalNewPlaylist.style.display = 'none'; }
       else if (screenPlayer && screenPlayer.style.display === 'flex') volverALista();
