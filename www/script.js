@@ -28,7 +28,8 @@ const coverImg = $('coverImg');
 const coverBadge = $('coverBadge');
 const backToListBtn = $('backToListBtn');
 const bgInput = $('bgInput');
-const bgBlurSlider = $('bgBlurSlider'); // Nuevo control
+const bgBlurSlider = $('bgBlurSlider');
+const customBg = document.getElementById('custom-bg');
 
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
@@ -252,31 +253,47 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
-// LÓGICA DEL FONDO
+// ==========================================
+// LÓGICA DEL FONDO (CON MEMORIA)
+// ==========================================
+
+// Función para aplicar el fondo y el blur
+function applyBackground(imageSrc, blurAmount) {
+  if (!customBg) return;
+  customBg.style.backgroundImage = `url(${imageSrc})`;
+  customBg.style.filter = `blur(${blurAmount}px)`;
+  document.body.classList.add('has-custom-bg');
+}
+
+// Al seleccionar una nueva foto
 if (bgInput) {
   bgInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      const customBg = document.getElementById('custom-bg');
-      if (customBg) {
-        customBg.style.backgroundImage = `url(${url})`;
-        document.body.classList.add('has-custom-bg');
-        // Reiniciar el deslizador a 0 al poner una foto nueva
-        if (bgBlurSlider) {
-          bgBlurSlider.value = 0;
-          customBg.style.filter = 'blur(0px)';
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64Image = event.target.result;
+        try {
+          // Guardar en la memoria del celular
+          localStorage.setItem('ymPlay_customBg', base64Image);
+          localStorage.setItem('ymPlay_bgBlur', '0'); // Reiniciar blur
+          
+          if (bgBlurSlider) bgBlurSlider.value = 0;
+          applyBackground(base64Image, 0);
+        } catch (err) {
+          alert("La imagen es muy grande para guardarla. Intenta con una foto más pequeña.");
         }
-      }
+      };
+      reader.readAsDataURL(file);
     }
   });
 }
 
-// LÓGICA DEL DESLIZADOR DE DESENFOQUE
+// Al mover el deslizador de desenfoque
 if (bgBlurSlider) {
   bgBlurSlider.addEventListener('input', (e) => {
     const val = e.target.value;
-    const customBg = document.getElementById('custom-bg');
+    localStorage.setItem('ymPlay_bgBlur', val); // Guardar el nivel
     if (customBg) {
       customBg.style.filter = `blur(${val}px)`;
     }
@@ -300,6 +317,17 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
+// ARRANQUE DE LA APP
 document.addEventListener('DOMContentLoaded', () => {
+  // 1. Cargar el fondo guardado (si existe)
+  const savedBg = localStorage.getItem('ymPlay_customBg');
+  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
+  
+  if (savedBg) {
+    if (bgBlurSlider) bgBlurSlider.value = savedBlur;
+    applyBackground(savedBg, savedBlur);
+  }
+
+  // 2. Escanear música
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
 });
