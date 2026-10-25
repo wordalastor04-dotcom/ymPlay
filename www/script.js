@@ -10,6 +10,7 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
+// ⚠️ IMPORTANTE: CAMBIA ESTE NÚMERO CADA VEZ QUE COMPILES UN APK NUEVO
 const CURRENT_APP_VERSION = "1.0.5"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
@@ -78,149 +79,37 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// ESCANEO DE MÚSICA Y PERMISOS (AUTO-PROMPT)
+// AVISO DE ACTUALIZACIÓN (Lectura segura en segundo plano)
 // ============================================================
-async function escanearMusicaNativa() {
-  const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
-  if (!window.Capacitor || !MediaStorePlugin) {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
-    return;
-  }
-
+async function checkForUpdates() {
   try {
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Solicitando permiso de música...</li>';
-    
-    // ESTO FUERZA LA VENTANA EMERGENTE EN TODAS LAS VERSIONES DE ANDROID
-    const permission = await MediaStorePlugin.requestPermissions({ types: ['audio'] });
-    
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
-    
-    const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
-    const listaAudios = result.media || result.medias || [];
-
-    if (listaAudios.length > 0) {
-      tracks = listaAudios.map(song => {
-        return {
-          name: song.title || song.name || 'Desconocido',
-          artist: song.artist || 'Artista desconocido',
-          url: song.url || song.uri || song.path,
-          cover: song.albumArt || song.albumArtUri || song.cover || '',
-          dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-          duration: song.duration || song.durationMs || 0 
-        };
-      }).filter(t => {
-        if (!t.url) return false;
-        let dur = t.duration;
-        if (dur > 0 && dur < 1000) dur = dur * 1000; 
-        return dur >= 60000; 
-      });
-      sortTracks('newest');
+    let data;
+    // Usar CapacitorHttp para que no falle en el WebView de Android
+    if (window.Capacitor && window.Capacitor.Plugins.CapacitorHttp) {
+      const response = await window.Capacitor.Plugins.CapacitorHttp.get({ url: UPDATE_JSON_URL });
+      data = response.data;
     } else {
-      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música (o no diste el permiso).</li>';
+      const response = await fetch(UPDATE_JSON_URL);
+      data = await response.json();
     }
-  } catch (error) {
-    console.error(error);
-    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Ve a Ajustes > Apps > ymPlay > Permisos y activa Música.</li>';
-  }
-}
-
-// ============================================================
-// REPRODUCTOR Y NOTIFICACIONES NATIVAS WEB (NO CIERRAN LA APP)
-// ============================================================
-function setupWebMediaSession(track, coverUrl) {
-  if ('mediaSession' in navigator) {
-    try {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.name,
-        artist: track.artist,
-        album: 'ymPlay',
-        artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-      });
-      navigator.mediaSession.setActionHandler('play', () => playAudio());
-      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-      navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
-      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-    } catch (e) { console.log("MediaSession error", e); }
-  }
-}
-
-function cargarCancion(index) {
-  if (index < 0 || index >= tracks.length) return;
-  currentIndex = index;
-  const track = tracks[index];
-  const playableUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.url) : track.url;
-  
-  audio.src = playableUrl;
-  
-  if(songTitle) songTitle.textContent = track.name;
-  if(songArtist) songArtist.textContent = track.artist;
-  if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
-
-  let coverUrl = '';
-  if (track.cover && coverImg) {
-    coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
-    coverImg.src = coverUrl;
-    coverImg.style.display = 'block';
-  } else if (coverImg) {
-    coverImg.style.display = 'none';
-  }
-
-  if (miniPlayer) {
-    miniPlayer.style.display = 'flex';
-    miniTitle.textContent = track.name;
-    miniArtist.textContent = track.artist;
-    if (coverUrl) {
-      miniCover.src = coverUrl;
-      miniCover.style.display = 'block';
-    } else {
-      miniCover.style.display = 'none';
+    
+    // Si el JSON tiene una versión diferente a la del APK, mostramos el aviso
+    if (data && data.version !== CURRENT_APP_VERSION) {
+      if (updateBanner) {
+        downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
+        updateBanner.classList.add('show');
+      }
     }
+  } catch (e) {
+    // Si no hay internet, falla silenciosamente y la app sigue funcionando localmente
+    console.log("No se pudo comprobar la actualización (Offline).");
   }
-
-  setupWebMediaSession(track, coverUrl);
-  resetProgress();
-  playAudio();
 }
 
-function playAudio() {
-  if (currentIndex === -1) return;
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-  audio.play().catch(err => console.warn('Error al reproducir:', err));
-}
-
-function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
-function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
-function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
-
-audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
-audio.addEventListener('timeupdate', () => {
-  if (!audio.duration) return;
-  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
-  if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
-});
-audio.addEventListener('play', () => { 
-  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
-  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
-  setupAudioContext();
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
-});
-audio.addEventListener('pause', () => { 
-  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
-  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-});
-audio.addEventListener('ended', nextTrack);
-
-if (progressBar) {
-  progressBar.addEventListener('click', e => {
-    if (!audio.duration) return;
-    const rect = progressBar.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
-  });
-}
+if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
 // ============================================================
-// RESTO DEL CÓDIGO (Playlists, Vistas, Ecualizador, etc)
+// LÓGICA LOCAL (PLAYLISTS, ESCANEO, ETC)
 // ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
@@ -309,6 +198,46 @@ function renderPlaylist() {
   });
 }
 
+async function escanearMusicaNativa() {
+  const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
+  if (!window.Capacitor || !MediaStorePlugin) {
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
+    return;
+  }
+  try {
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Solicitando permiso de música...</li>';
+    await MediaStorePlugin.requestPermissions({ types: ['audio'] });
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    
+    const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
+    const listaAudios = result.media || result.medias || [];
+
+    if (listaAudios.length > 0) {
+      tracks = listaAudios.map(song => {
+        return {
+          name: song.title || song.name || 'Desconocido',
+          artist: song.artist || 'Artista desconocido',
+          url: song.url || song.uri || song.path,
+          cover: song.albumArt || song.albumArtUri || song.cover || '',
+          dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
+          duration: song.duration || song.durationMs || 0 
+        };
+      }).filter(t => {
+        if (!t.url) return false;
+        let dur = t.duration;
+        if (dur > 0 && dur < 1000) dur = dur * 1000; 
+        return dur >= 60000;
+      });
+      sortTracks('newest');
+    } else {
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
+    }
+  } catch (error) {
+    console.error(error);
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos en Ajustes.</li>';
+  }
+}
+
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
   if (criteria === 'newest') tracks.sort((a, b) => b.dateAdded - a.dateAdded);
@@ -321,6 +250,92 @@ function sortTracks(criteria) {
 
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
+
+function cargarCancion(index) {
+  if (index < 0 || index >= tracks.length) return;
+  currentIndex = index;
+  const track = tracks[index];
+  const playableUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.url) : track.url;
+  audio.src = playableUrl;
+  
+  if(songTitle) songTitle.textContent = track.name;
+  if(songArtist) songArtist.textContent = track.artist;
+  if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
+
+  let coverUrl = '';
+  if (track.cover && coverImg) {
+    coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
+    coverImg.src = coverUrl;
+    coverImg.style.display = 'block';
+  } else if (coverImg) {
+    coverImg.style.display = 'none';
+  }
+
+  if (miniPlayer) {
+    miniPlayer.style.display = 'flex';
+    miniTitle.textContent = track.name;
+    miniArtist.textContent = track.artist;
+    if (coverUrl) { miniCover.src = coverUrl; miniCover.style.display = 'block'; } else { miniCover.style.display = 'none'; }
+  }
+
+  setupNativeMediaSession(track, coverUrl);
+  resetProgress();
+  playAudio();
+}
+
+async function setupNativeMediaSession(track, coverUrl) {
+  const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
+  if (MediaSessionPlugin) {
+    try {
+      await MediaSessionPlugin.setMetadata({
+        title: track.name, artist: track.artist, album: 'ymPlay',
+        artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
+      });
+      await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
+      await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
+      await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
+      await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
+      await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
+    } catch (e) { console.warn("Error en MediaSession:", e); }
+  }
+}
+
+function playAudio() {
+  if (currentIndex === -1) return;
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  audio.play().catch(err => console.warn('Error al reproducir:', err));
+}
+
+function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
+function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
+function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
+
+audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return;
+  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
+  if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
+});
+audio.addEventListener('play', () => { 
+  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
+  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+  setupAudioContext();
+  if (window.Capacitor?.Plugins?.MediaSession) window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'playing' });
+});
+audio.addEventListener('pause', () => { 
+  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  if (window.Capacitor?.Plugins?.MediaSession) window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'paused' });
+});
+audio.addEventListener('ended', nextTrack);
+
+if (progressBar) {
+  progressBar.addEventListener('click', e => {
+    if (!audio.duration) return;
+    const rect = progressBar.getBoundingClientRect();
+    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+  });
+}
 
 function setupAudioContext() {
   if (sourceNode) return; 
@@ -376,15 +391,6 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); }); });
 
-async function checkForUpdates() {
-  try {
-    let data;
-    if (window.Capacitor && window.Capacitor.Plugins.CapacitorHttp) { const response = await window.Capacitor.Plugins.CapacitorHttp.get({ url: UPDATE_JSON_URL }); data = response.data; } else { const response = await fetch(UPDATE_JSON_URL); data = await response.json(); }
-    if (data && data.version !== CURRENT_APP_VERSION) { if (updateBanner) { downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system'); updateBanner.classList.add('show'); } }
-  } catch (e) {}
-}
-if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
-
 function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
@@ -403,7 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   const savedBg = localStorage.getItem('ymPlay_customBg'); const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) { if (bgBlurSlider) bgBlurSlider.value = savedBlur; applyBackground(savedBg, savedBlur); }
+  
+  // Arrancar escaneo (local)
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
+  
+  // Comprobar actualizaciones (solo si hay internet, no bloquea la app)
   checkForUpdates();
+  
   setupBackButton();
 });
