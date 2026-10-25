@@ -4,60 +4,52 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: actions/setup-java@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
-          
-      - name: Instalar dependencias
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
         run: npm install
-        
-      - name: Añadir plataforma Android
+
+      - name: Add Android platform
         run: npx cap add android
-        
-      - name: Añadir permisos de audio al Manifest
+
+      - name: Add audio permissions to Manifest
         run: |
           sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/><\/manifest>/' android/app/src/main/AndroidManifest.xml
-          
-      - name: Decodificar Keystore P12
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
-          
-      - name: Convertir P12 a JKS
-        run: |
-          keytool -importkeystore \
-            -srckeystore android/release.p12 -srcstoretype PKCS12 \
-            -destkeystore android/release.jks -deststoretype JKS \
-            -srcstorepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            -deststorepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            -srcalias "${{ secrets.ANDROID_KEY_ALIAS }}" \
-            -destalias "${{ secrets.ANDROID_KEY_ALIAS }}" \
-            -noprompt
-          
-      - name: Configurar Firma en build.gradle
-        run: |
-          # Insertar la configuración de firma apuntando al nuevo archivo .jks
-          sed -i 's/buildTypes {/signingConfigs {\n        release {\n            storeFile file("..\/release.jks")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEYSTORE_PASSWORD")\n        }\n    }\n    buildTypes {/' android/app/build.gradle
-          # Forzar al modo Debug a usar esta firma
-          sed -i 's/buildTypes {/buildTypes {\n        debug {\n            signingConfig signingConfigs.release\n        }/' android/app/build.gradle
-          
-      - name: Sincronizar Capacitor
+
+      - name: Sync Capacitor
         run: npx cap sync
-        
-      - name: Compilar APK Firmado
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+
+      - name: Build debug APK
         run: |
           cd android
           ./gradlew assembleDebug
-          
-      - name: Subir APK
+
+      - name: Extract signing key
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
+
+      - name: Sign APK with jarsigner
+        run: |
+          jarsigner -keystore android/release.p12 \
+            -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -signedjar android/app/build/outputs/apk/debug/app-debug-signed.apk \
+            android/app/build/outputs/apk/debug/app-debug.apk \
+            "${{ secrets.ANDROID_KEY_ALIAS }}"
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
           name: ymPlay-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug-signed.apk
