@@ -1,5 +1,5 @@
 const audio = new Audio();
-audio.crossOrigin = "anonymous";
+// Eliminamos crossOrigin para evitar micro-cortes con archivos locales
 let tracks = [];
 let currentIndex = -1;
 let playlists = [];
@@ -37,6 +37,15 @@ const bgInput = $('bgInput');
 const bgBlurSlider = $('bgBlurSlider');
 const customBg = document.getElementById('custom-bg');
 
+// Mini Reproductor
+const miniPlayer = $('mini-player');
+const miniCover = $('miniCover');
+const miniTitle = $('miniTitle');
+const miniArtist = $('miniArtist');
+const miniPlayBtn = $('miniPlayBtn');
+const miniNextBtn = $('miniNextBtn');
+const miniInfoBtn = $('miniInfoBtn');
+
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
 const menuOverlay = $('menu-overlay');
@@ -70,43 +79,57 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// 1. MEMORIA Y CACHÉ DE MÚSICA (No volver a escanear siempre)
+// 1. MEMORIA Y CACHÉ (Optimizado para no cortar audio)
 // ============================================================
 function loadCachedTracks() {
   const cached = localStorage.getItem('ymPlay_tracks_cache');
   if (cached) {
     tracks = JSON.parse(cached);
-    if (tracks.length > 0) {
-      sortTracks('newest'); // Esto ya renderiza la lista
-    }
+    if (tracks.length > 0) renderPlaylist();
   }
 }
 
 function saveTracksCache() {
-  try {
-    localStorage.setItem('ymPlay_tracks_cache', JSON.stringify(tracks));
-  } catch (e) {
-    console.warn("No se pudo guardar la caché de canciones (posible límite de memoria).");
+  try { localStorage.setItem('ymPlay_tracks_cache', JSON.stringify(tracks)); } catch (e) {}
+}
+
+function guardarProgreso() {
+  if (currentIndex !== -1 && tracks[currentIndex]) {
+    localStorage.setItem('ymPlay_lastTrackUrl', tracks[currentIndex].url);
+    localStorage.setItem('ymPlay_lastTime', audio.currentTime);
+    localStorage.setItem('ymPlay_isPlaying', !audio.paused);
   }
 }
 
-// ============================================================
-// 2. LÓGICA DE COLA DE REPRODUCCIÓN (Bucle en Playlists)
-// ============================================================
-function getActiveQueue() {
-  // Si estamos reproduciendo desde una playlist, la cola es esa playlist
-  if (currentPlaylistId !== null) {
-    const pl = playlists.find(p => p.id === currentPlaylistId);
-    if (pl) {
-      return tracks.filter(t => pl.songs.includes(t.url));
+function restaurarSesion() {
+  const lastUrl = localStorage.getItem('ymPlay_lastTrackUrl');
+  const lastTime = parseFloat(localStorage.getItem('ymPlay_lastTime') || 0);
+  if (lastUrl) {
+    const idx = tracks.findIndex(t => t.url === lastUrl);
+    if (idx !== -1) {
+      cargarCancion(idx, lastTime);
+      if (localStorage.getItem('ymPlay_isPlaying') === 'false') audio.pause();
     }
   }
-  // Si no, la cola es toda la música
+}
+
+// Guardar solo al pausar o cerrar la app para no dar tirones en el audio
+audio.addEventListener('pause', guardarProgreso);
+document.addEventListener('visibilitychange', () => { if (document.hidden) guardarProgreso(); });
+
+// ============================================================
+// 2. BUCLE DE PLAYLIST
+// ============================================================
+function getActiveQueue() {
+  if (currentPlaylistId !== null) {
+    const pl = playlists.find(p => p.id === currentPlaylistId);
+    if (pl) return tracks.filter(t => pl.songs.includes(t.url));
+  }
   return tracks;
 }
 
 // ============================================================
-// 3. NOTIFICACIÓN MULTIMEDIA (API WEB)
+// 3. NOTIFICACIÓN MULTIMEDIA
 // ============================================================
 function setupMediaSession(track, coverUrl) {
   if ('mediaSession' in navigator) {
@@ -124,7 +147,7 @@ function setupMediaSession(track, coverUrl) {
 }
 
 // ============================================================
-// 4. ACTUALIZACIÓN Y VISTAS
+// 4. VISTAS
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -221,14 +244,26 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
 // ============================================================
-// 5. ESCANEO DE MÚSICA (Con caché)
+// 5. RENDERIZAR Y ESCANEAR
 // ============================================================
+function renderPlaylist() {
+  if (!playlistEl) return;
+  if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
+  if (tracks.length === 0) { playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música.</li>'; return; }
+  playlistEl.innerHTML = tracks.map((t, i) => {
+    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
+    return `<li data-index="${i}" class="${i === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
+  }).join('');
+  playlistEl.querySelectorAll('li').forEach(li => {
+    li.addEventListener('click', () => { const idx = parseInt(li.dataset.index); if (idx !== currentIndex) cargarCancion(idx); abrirReproductor(); });
+  });
+}
+
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) return;
   
   try {
-    // Si ya hay caché, no mostramos el mensaje de "Buscando" para que sea instantáneo
     if (tracks.length === 0) {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
     }
@@ -252,31 +287,16 @@ async function escanearMusicaNativa() {
         return dur >= 60000;
       });
 
-      // Comparamos si hay canciones nuevas para no recargar la UI de golpe
       if (newTracks.length !== tracks.length) {
         tracks = newTracks;
-        saveTracksCache(); // Guardamos en memoria
+        saveTracksCache();
         sortTracks('newest');
+        restaurarSesion(); // Restaurar después de tener la lista
       }
     } else if (tracks.length === 0) {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
     }
-  } catch (error) {
-    console.warn("Error al escanear en segundo plano", error);
-  }
-}
-
-function renderPlaylist() {
-  if (!playlistEl) return;
-  if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
-  if (tracks.length === 0) { playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No hay música.</li>'; return; }
-  playlistEl.innerHTML = tracks.map((t, i) => {
-    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
-    return `<li data-index="${i}" class="${i === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
-  }).join('');
-  playlistEl.querySelectorAll('li').forEach(li => {
-    li.addEventListener('click', () => { const idx = parseInt(li.dataset.index); if (idx !== currentIndex) cargarCancion(idx); abrirReproductor(); });
-  });
+  } catch (error) {}
 }
 
 function sortTracks(criteria) {
@@ -290,7 +310,7 @@ function sortTracks(criteria) {
 }
 
 // ============================================================
-// 6. REPRODUCTOR (Con la lógica de la cola)
+// 6. REPRODUCTOR
 // ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
@@ -323,6 +343,19 @@ function cargarCancion(index, startTime = 0) {
     coverImg.style.display = 'none';
   }
 
+  // ACTUALIZAR MINI REPRODUCTOR (FORZADO)
+  if (miniPlayer) {
+    miniPlayer.style.display = 'flex'; // <-- Asegura que se muestre
+    miniTitle.textContent = track.name;
+    miniArtist.textContent = track.artist;
+    if (coverUrl) {
+      miniCover.src = coverUrl;
+      miniCover.style.display = 'block';
+    } else {
+      miniCover.style.display = 'none';
+    }
+  }
+
   setupMediaSession(track, coverUrl);
   if(startTime === 0) resetProgress();
   playAudio();
@@ -339,34 +372,25 @@ function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 function prevTrack() { 
   const queue = getActiveQueue();
   if (queue.length === 0) return;
-  
   const currentUrl = tracks[currentIndex]?.url;
   let qIndex = queue.findIndex(t => t.url === currentUrl);
-  
   if (qIndex === -1) qIndex = 0; 
-  const prevQIndex = (qIndex - 1 + queue.length) % queue.length; // Lógica de bucle inverso
-  
-  const prevTrackObj = queue[prevQIndex];
-  const realIndex = tracks.findIndex(t => t.url === prevTrackObj.url);
+  const prevQIndex = (qIndex - 1 + queue.length) % queue.length;
+  const realIndex = tracks.findIndex(t => t.url === queue[prevQIndex].url);
   if (realIndex !== -1) cargarCancion(realIndex);
 }
 
 function nextTrack() { 
   const queue = getActiveQueue();
   if (queue.length === 0) return;
-  
   const currentUrl = tracks[currentIndex]?.url;
   let qIndex = queue.findIndex(t => t.url === currentUrl);
-  
   if (qIndex === -1) qIndex = -1; 
-  const nextQIndex = (qIndex + 1) % queue.length; // Lógica de bucle
-  
-  const nextTrackObj = queue[nextQIndex];
-  const realIndex = tracks.findIndex(t => t.url === nextTrackObj.url);
+  const nextQIndex = (qIndex + 1) % queue.length;
+  const realIndex = tracks.findIndex(t => t.url === queue[nextQIndex].url);
   if (realIndex !== -1) cargarCancion(realIndex);
 }
 
-// Eventos de audio
 audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
@@ -375,11 +399,13 @@ audio.addEventListener('timeupdate', () => {
 });
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
+  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
   setupAudioContext();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
 audio.addEventListener('pause', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 });
 audio.addEventListener('ended', nextTrack);
@@ -393,7 +419,7 @@ if (progressBar) {
 }
 
 // ============================================================
-// 7. ECUALIZADOR, FONDO Y TEMA
+// 7. ECUALIZADOR Y FONDO
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
@@ -418,7 +444,7 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
 
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
-function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
+function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; }
 function formatTime(sec) { if (isNaN(sec) || !isFinite(sec)) return '0:00'; return `${Math.floor(sec/60)}:${Math.floor(sec%60).toString().padStart(2, '0')}`; }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -437,8 +463,14 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
+// CONTROLES DEL MINI REPRODUCTOR
+if (miniPlayBtn) miniPlayBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(); });
+if (miniNextBtn) miniNextBtn.addEventListener('click', (e) => { e.stopPropagation(); nextTrack(); });
+if (miniInfoBtn) miniInfoBtn.addEventListener('click', abrirReproductor);
+if (miniCover) miniCover.addEventListener('click', abrirReproductor);
+
 function applyBackground(imageSrc, blurAmount) { if (!customBg) return; customBg.style.backgroundImage = `url(${imageSrc})`; customBg.style.filter = `blur(${blurAmount}px)`; document.body.classList.add('has-custom-bg'); }
-if (bgInput) { bgInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { const base64Image = event.target.result; try { localStorage.setItem('ymPlay_customBg', base64Image); localStorage.setItem('ymPlay_bgBlur', '0'); if (bgBlurSlider) bgBlurSlider.value = 0; applyBackground(base64Image, 0); } catch (err) { alert("La imagen es muy grande."); } }; reader.readAsDataURL(file); } }); }
+if (bgInput) { bgInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (event) => { const base64Image = event.target.result; try { localStorage.setItem('ymPlay_customBg', base64Image); localStorage.setItem('ymPlay_bgBlur', '0'); if (bgBlurSlider) bgBlurSlider.value = 0; applyBackground(base64Image, 0); } catch (err) {} }; reader.readAsDataURL(file); } }); }
 if (bgBlurSlider) { bgBlurSlider.addEventListener('input', (e) => { const val = e.target.value; localStorage.setItem('ymPlay_bgBlur', val); if (customBg) customBg.style.filter = `blur(${val}px)`; }); }
 
 const themeBtn = document.getElementById('themeToggle');
@@ -460,17 +492,12 @@ function setupBackButton() {
 }
 
 // ============================================================
-// 8. ARRANQUE (Carga instantánea de caché)
+// 8. ARRANQUE
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
-  
-  // 1. Cargar canciones desde la memoria (instantáneo)
   loadCachedTracks();
-
-  // 2. En segundo plano, buscar canciones nuevas y actualizar
-  setTimeout(() => { escanearMusicaNativa(); }, 1000);
-
+  
   if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
     window.Capacitor.Plugins.LocalNotifications.requestPermissions();
   }
@@ -479,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) { if (bgBlurSlider) bgBlurSlider.value = savedBlur; applyBackground(savedBg, savedBlur); }
   
+  setTimeout(() => { escanearMusicaNativa(); }, 1000);
   checkForUpdates();
   setupBackButton();
 });
