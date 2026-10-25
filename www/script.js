@@ -79,12 +79,11 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// AVISO DE ACTUALIZACIÓN (Lectura segura en segundo plano)
+// AVISO DE ACTUALIZACIÓN
 // ============================================================
 async function checkForUpdates() {
   try {
     let data;
-    // Usar CapacitorHttp para que no falle en el WebView de Android
     if (window.Capacitor && window.Capacitor.Plugins.CapacitorHttp) {
       const response = await window.Capacitor.Plugins.CapacitorHttp.get({ url: UPDATE_JSON_URL });
       data = response.data;
@@ -93,7 +92,6 @@ async function checkForUpdates() {
       data = await response.json();
     }
     
-    // Si el JSON tiene una versión diferente a la del APK, mostramos el aviso
     if (data && data.version !== CURRENT_APP_VERSION) {
       if (updateBanner) {
         downloadUpdateBtn.onclick = () => window.open(data.url || UPDATE_DOWNLOAD_URL, '_system');
@@ -101,15 +99,13 @@ async function checkForUpdates() {
       }
     }
   } catch (e) {
-    // Si no hay internet, falla silenciosamente y la app sigue funcionando localmente
     console.log("No se pudo comprobar la actualización (Offline).");
   }
 }
-
 if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
 // ============================================================
-// LÓGICA LOCAL (PLAYLISTS, ESCANEO, ETC)
+// CONTROL DE VISTAS (Canciones, Playlists, Detalle)
 // ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
@@ -129,6 +125,9 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
   });
 });
 
+// ============================================================
+// LÓGICA DE PLAYLISTS
+// ============================================================
 function loadPlaylists() { const saved = localStorage.getItem('ymPlay_playlists'); if (saved) playlists = JSON.parse(saved); }
 function savePlaylists() { localStorage.setItem('ymPlay_playlists', JSON.stringify(playlists)); }
 
@@ -185,6 +184,9 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 });
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
+// ============================================================
+// RENDERIZAR LISTA PRINCIPAL
+// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -198,6 +200,9 @@ function renderPlaylist() {
   });
 }
 
+// ============================================================
+// ESCANEO DE MÚSICA
+// ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) {
@@ -248,6 +253,9 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
+// ============================================================
+// REPRODUCTOR Y NOTIFICACIONES NATIVAS
+// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
@@ -337,6 +345,9 @@ if (progressBar) {
   });
 }
 
+// ============================================================
+// ECUALIZADOR
+// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
@@ -358,6 +369,9 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
 });
 
+// ============================================================
+// NAVEGACIÓN Y FONDO
+// ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
@@ -391,6 +405,9 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); }); });
 
+// ============================================================
+// BOTÓN ATRÁS (ANDROID)
+// ============================================================
 function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
@@ -405,16 +422,26 @@ function setupBackButton() {
   }
 }
 
+// ============================================================
+// ARRANQUE DE LA APP Y PERMISOS DE NOTIFICACIÓN
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
-  const savedBg = localStorage.getItem('ymPlay_customBg'); const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
+  
+  // PEDIR PERMISO DE NOTIFICACIONES (Android 13+)
+  if (window.Capacitor && window.Capacitor.Plugins.LocalNotifications) {
+    window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(result => {
+      console.log("Permiso de notificaciones:", result.display);
+    });
+  } else if ('Notification' in window) {
+    Notification.requestPermission();
+  }
+
+  const savedBg = localStorage.getItem('ymPlay_customBg'); 
+  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
   if (savedBg) { if (bgBlurSlider) bgBlurSlider.value = savedBlur; applyBackground(savedBg, savedBlur); }
   
-  // Arrancar escaneo (local)
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
-  
-  // Comprobar actualizaciones (solo si hay internet, no bloquea la app)
   checkForUpdates();
-  
   setupBackButton();
 });
