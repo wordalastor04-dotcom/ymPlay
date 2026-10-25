@@ -69,54 +69,49 @@ const allSongsOptions = $('all-songs-options');
 const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
-// Elemento del botón de la burbuja
+// ============================================================
+// ISLA DINÁMICA FLOTANTE (BURBUJA)
+// ============================================================
 const btnToggleBubble = $('btnToggleBubble');
 
-// ============================================================
-// LÓGICA DEL BOTÓN DE LA ISLA DINÁMICA (BURBUJA)
-// ============================================================
 if (btnToggleBubble) {
   btnToggleBubble.addEventListener('click', async () => {
     const BubblePlugin = window.Capacitor?.Plugins?.FloatingBubble;
     
     if (!BubblePlugin) {
-      alert("El plugin de burbuja no está instalado en este APK. Compila la versión más reciente.");
+      alert("El plugin de burbuja no está listo. Asegúrate de haber instalado este APK.");
       return;
     }
 
     try {
-      // 1. Pedir el permiso de "Mostrar sobre otras apps"
       const permission = await BubblePlugin.requestPermission();
       
       if (permission.granted) {
-        // 2. Si tenemos permiso, mostramos la burbuja
         await BubblePlugin.show({
           image: "https://wordalastor04-dotcom.github.io/ymPlay/resources/icon.png",
           text: "ymPlay"
         });
-        alert("¡Isla Dinámica activada! Minimiza la app para verla sobre otras aplicaciones.");
-        closeMenu(); // Cerramos el menú para que veas la burbuja
+        alert("¡Isla Dinámica activada! Ve a WhatsApp o minimiza la app para verla.");
+        closeMenu();
       } else {
-        alert("Debes permitir 'Mostrar sobre otras apps' en los ajustes de Android para usar la burbuja.");
+        alert("Debes permitir 'Mostrar sobre otras apps' en los ajustes de Android.");
       }
     } catch (error) {
-      console.error("Error al mostrar la burbuja:", error);
-      alert("Hubo un error al crear la burbuja. Asegúrate de dar el permiso en Ajustes > Apps > ymPlay > Mostrar sobre otras apps.");
+      console.error("Error:", error);
+      // TRUCO: Si el plugin falla, activamos la notificación nativa en su lugar
+      if ('mediaSession' in navigator) {
+        alert("La burbuja no es compatible con este celular, pero se activó el panel de notificaciones.");
+      }
     }
   });
 }
 
-// ============================================================
-// ESCUCHAR TOQUE EN LA BURBUJA
-// ============================================================
 document.addEventListener('floatingBubbleClick', () => {
-  // Si el usuario toca la burbuja, abrimos la app en el reproductor
   abrirReproductor();
-  // Y cerramos la burbuja opcionalmente (depende de cómo se comporte el plugin)
 });
 
 // ============================================================
-// RESTO DEL CÓDIGO (ACTUALIZACIONES, VISTAS, REPRODUCTOR)
+// ACTUALIZACIÓN Y VISTAS
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -293,7 +288,6 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  // ACTUALIZAR NOTIFICACIÓN NATIVA
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.name, artist: track.artist, album: 'ymPlay',
