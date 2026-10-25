@@ -5,7 +5,6 @@ const audio = new Audio();
 audio.crossOrigin = "anonymous";
 let tracks = [];
 let currentIndex = -1;
-let isPlaying = false;
 
 let audioCtx = null;
 let sourceNode = null;
@@ -13,15 +12,11 @@ let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 // ============================================================
-// 2. REFERENCIAS DOM (Búsqueda segura de elementos)
+// 2. REFERENCIAS DOM
 // ============================================================
 const $ = id => document.getElementById(id);
-
-// Pantallas
 const screenPlaylist = $('screen-playlist');
 const screenPlayer = $('screen-player');
-
-// Lista y reproductor
 const playlistEl = $('playlist');
 const trackCount = $('trackCount');
 const btnEscanear = $('btnEscanear');
@@ -39,7 +34,6 @@ const coverImg = $('coverImg');
 const coverBadge = $('coverBadge');
 const backToListBtn = $('backToListBtn');
 
-// Menú lateral
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
 const menuOverlay = $('menu-overlay');
@@ -64,9 +58,7 @@ async function escanearMusicaNativa() {
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
 
     const result = await MediaStorePlugin.getMediasByType({ 
-      mediaType: 'audio', 
-      sortBy: 'TITLE', 
-      includeExternal: true
+      mediaType: 'audio', sortBy: 'TITLE', includeExternal: true
     });
 
     const listaAudios = result.media || result.medias || [];
@@ -82,7 +74,6 @@ async function escanearMusicaNativa() {
         };
       }).filter(t => t.url);
       
-      // Por defecto, ordenamos por los más recientes
       sortTracks('newest');
     } else {
       if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
@@ -94,7 +85,7 @@ async function escanearMusicaNativa() {
 }
 
 // ============================================================
-// 4. RENDERIZAR LISTA (CON PORTADAS)
+// 4. RENDERIZAR LISTA
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
@@ -139,34 +130,21 @@ function renderPlaylist() {
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
 
-  if (criteria === 'newest') {
-    tracks.sort((a, b) => b.dateAdded - a.dateAdded);
-  } else if (criteria === 'oldest') {
-    tracks.sort((a, b) => a.dateAdded - b.dateAdded);
-  } else if (criteria === 'title') {
-    tracks.sort((a, b) => a.name.localeCompare(b.name));
-  }
+  if (criteria === 'newest') tracks.sort((a, b) => b.dateAdded - a.dateAdded);
+  else if (criteria === 'oldest') tracks.sort((a, b) => a.dateAdded - b.dateAdded);
+  else if (criteria === 'title') tracks.sort((a, b) => a.name.localeCompare(b.name));
 
-  if (currentTrackUrl) {
-    currentIndex = tracks.findIndex(t => t.url === currentTrackUrl);
-  }
+  if (currentTrackUrl) currentIndex = tracks.findIndex(t => t.url === currentTrackUrl);
 
   renderPlaylist();
   closeMenu();
 }
 
-function openMenu() {
-  if(sideMenu) sideMenu.classList.add('open');
-  if(menuOverlay) menuOverlay.classList.add('active');
-}
-
-function closeMenu() {
-  if(sideMenu) sideMenu.classList.remove('open');
-  if(menuOverlay) menuOverlay.classList.remove('active');
-}
+function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
+function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
 // ============================================================
-// 6. REPRODUCTOR Y REPRODUCCIÓN DE AUDIO
+// 6. REPRODUCTOR Y NOTIFICACIÓN (PLUGIN NATIVO)
 // ============================================================
 function cargarCancion(index) {
   if (index < 0 || index >= tracks.length) return;
@@ -180,15 +158,45 @@ function cargarCancion(index) {
   if(songArtist) songArtist.textContent = track.artist;
   if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
 
+  let coverUrl = '';
   if (track.cover && coverImg) {
-    coverImg.src = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
+    coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
+    coverImg.src = coverUrl;
     coverImg.style.display = 'block';
   } else if (coverImg) {
     coverImg.style.display = 'none';
   }
 
+  // Llamar a la configuración nativa del panel de notificaciones
+  setupNativeMediaSession(track, coverUrl);
+
   resetProgress();
   playAudio();
+}
+
+async function setupNativeMediaSession(track, coverUrl) {
+  const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
+  
+  if (MediaSessionPlugin) {
+    try {
+      // Enviar metadatos a Android
+      await MediaSessionPlugin.setMetadata({
+        title: track.name,
+        artist: track.artist,
+        album: 'ymPlay',
+        artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
+      });
+
+      // Escuchar los botones del panel del celular
+      await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
+      await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
+      await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
+      await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
+      
+    } catch (e) {
+      console.warn("Error en MediaSession nativo:", e);
+    }
+  }
 }
 
 function playAudio() {
@@ -197,46 +205,21 @@ function playAudio() {
   audio.play().catch(err => console.warn('Error al reproducir:', err));
 }
 
-function togglePlay() {
-  if (audio.paused) playAudio();
-  else audio.pause();
-}
-
-function prevTrack() {
-  if (tracks.length === 0) return;
-  const newIndex = currentIndex > 0 ? currentIndex - 1 : tracks.length - 1;
-  cargarCancion(newIndex);
-}
-
-function nextTrack() {
-  if (tracks.length === 0) return;
-  const newIndex = currentIndex < tracks.length - 1 ? currentIndex + 1 : 0;
-  cargarCancion(newIndex);
-}
+function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
+function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
+function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
 
 // ============================================================
-// 7. EVENTOS DE AUDIO, PROGRESO Y ECUALIZADOR
+// 7. EVENTOS DE AUDIO Y ECUALIZADOR
 // ============================================================
-audio.addEventListener('loadedmetadata', () => {
-  if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration);
-});
-
+audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
-  const pct = (audio.currentTime / audio.duration) * 100;
-  if(progressFill) progressFill.style.width = `${pct}%`;
+  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
   if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
 });
-
-audio.addEventListener('play', () => {
-  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>';
-  setupAudioContext(); 
-});
-
-audio.addEventListener('pause', () => {
-  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-});
-
+audio.addEventListener('play', () => { if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; setupAudioContext(); });
+audio.addEventListener('pause', () => { if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; });
 audio.addEventListener('ended', nextTrack);
 
 if (progressBar) {
@@ -253,16 +236,11 @@ function setupAudioContext() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     sourceNode = audioCtx.createMediaElementSource(audio);
-    
     eqFilters = EQ_FREQS.map(freq => {
       const filter = audioCtx.createBiquadFilter();
-      filter.type = 'peaking'; 
-      filter.frequency.value = freq; 
-      filter.Q.value = 1; 
-      filter.gain.value = 0;
+      filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0;
       return filter;
     });
-
     let prev = sourceNode;
     eqFilters.forEach(f => { prev.connect(f); prev = f; });
     prev.connect(audioCtx.destination);
@@ -271,8 +249,7 @@ function setupAudioContext() {
 
 document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
   slider.addEventListener('input', () => {
-    const gain = parseFloat(slider.value);
-    if (eqFilters[i]) eqFilters[i].gain.value = gain;
+    if (eqFilters[i]) eqFilters[i].gain.value = parseFloat(slider.value);
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   });
 });
@@ -280,15 +257,9 @@ document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) 
 document.getElementById('eqPresets')?.addEventListener('click', e => {
   const btn = e.target.closest('.preset-btn');
   if (!btn) return;
-
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
-  const gains = {
-    flat: [0, 0, 0, 0, 0], rock: [5, 3, -1, 3, 5], pop: [-1, 2, 4, 2, -1],
-    jazz: [3, 1, -2, 1, 3], vocal: [-2, 0, 4, 3, -1]
-  }[btn.dataset.preset] || [0, 0, 0, 0, 0];
-
+  const gains = { flat: [0,0,0,0,0], rock: [5,3,-1,3,5], pop: [-1,2,4,2,-1], jazz: [3,1,-2,1,3], vocal: [-2,0,4,3,-1] }[btn.dataset.preset] || [0,0,0,0,0];
   document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
     slider.value = gains[i];
     if (eqFilters[i]) eqFilters[i].gain.value = gains[i];
@@ -296,18 +267,12 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
 });
 
 // ============================================================
-// 8. NAVEGACIÓN, PESTAÑAS Y UTILIDADES
+// 8. NAVEGACIÓN Y UTILIDADES
 // ============================================================
-function abrirReproductor() {
-  if(screenPlaylist) screenPlaylist.style.display = 'none';
-  if(screenPlayer) screenPlayer.style.display = 'flex';
-}
-
-function volverALista() {
-  if(screenPlayer) screenPlayer.style.display = 'none';
-  if(screenPlaylist) screenPlaylist.style.display = 'flex';
-  renderPlaylist();
-}
+function abrirReproductor() { if(screenPlaylist) screenPlaylist.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
+function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenPlaylist) screenPlaylist.style.display = 'flex'; renderPlaylist(); }
+function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
+function formatTime(sec) { if (isNaN(sec) || !isFinite(sec)) return '0:00'; return `${Math.floor(sec/60)}:${Math.floor(sec%60).toString().padStart(2, '0')}`; }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -318,72 +283,34 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-function resetProgress() {
-  if(progressFill) progressFill.style.width = '0%';
-  if(currentTimeEl) currentTimeEl.textContent = '0:00';
-  if(totalTimeEl) totalTimeEl.textContent = '0:00';
-}
-
-function formatTime(sec) {
-  if (isNaN(sec) || !isFinite(sec)) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// ============================================================
-// 9. ASIGNACIÓN DE EVENTOS (BOTONES)
-// ============================================================
 if(playBtn) playBtn.addEventListener('click', togglePlay);
 if(prevBtn) prevBtn.addEventListener('click', prevTrack);
 if(nextBtn) nextBtn.addEventListener('click', nextTrack);
 if(backToListBtn) backToListBtn.addEventListener('click', volverALista);
-
 if(menuBtn) menuBtn.addEventListener('click', openMenu);
 if(closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
 if(menuOverlay) menuOverlay.addEventListener('click', closeMenu);
-
 if(sortNewestBtn) sortNewestBtn.addEventListener('click', () => sortTracks('newest'));
 if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('oldest'));
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
+if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
-if(btnEscanear) {
-  btnEscanear.addEventListener('click', (e) => {
-    e.preventDefault(); 
-    escanearMusicaNativa();
-  });
-}
-
-// ============================================================
-// 10. CAMBIO DE TEMA Y PALETA DE COLORES (¡El arreglo!)
-// ============================================================
-// Botón de Tema (Oscuro/Claro)
 const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) {
   themeBtn.addEventListener('click', () => {
     const html = document.documentElement;
-    const currentTheme = html.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', newTheme);
+    html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
   });
 }
 
-// Botones de Colores (Paleta)
 document.querySelectorAll('.palette-dot').forEach(dot => {
   dot.addEventListener('click', () => {
     document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
     dot.classList.add('active');
-    const color = dot.dataset.color;
-    document.documentElement.setAttribute('data-palette', color);
+    document.documentElement.setAttribute('data-palette', dot.dataset.color);
   });
 });
 
-// ============================================================
-// 11. ARRANQUE DE LA APP
-// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-  // Retraso para permitir que Android solicite los permisos
-  setTimeout(() => {
-    escanearMusicaNativa();
-  }, 1500);
+  setTimeout(() => { escanearMusicaNativa(); }, 1500);
 });
