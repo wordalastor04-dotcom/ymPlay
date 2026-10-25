@@ -70,48 +70,48 @@ const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
 // ============================================================
-// ISLA DINÁMICA FLOTANTE (BURBUJA)
+// 1. NOTIFICACIÓN MULTIMEDIA NATIVA (MediaStyle Android)
 // ============================================================
-const btnToggleBubble = $('btnToggleBubble');
+async function setupMediaSession(track, coverUrl) {
+  const MediaSessionPlugin = window.Capacitor?.Plugins?.MediaSession;
 
-if (btnToggleBubble) {
-  btnToggleBubble.addEventListener('click', async () => {
-    const BubblePlugin = window.Capacitor?.Plugins?.FloatingBubble;
-    
-    if (!BubblePlugin) {
-      alert("El plugin de burbuja no está listo. Asegúrate de haber instalado este APK.");
-      return;
-    }
-
+  if (MediaSessionPlugin) {
     try {
-      const permission = await BubblePlugin.requestPermission();
+      // A. Enviar metadatos (Título, Artista, Portada)
+      await MediaSessionPlugin.setMetadata({
+        title: track.name,
+        artist: track.artist,
+        album: 'ymPlay',
+        artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
+      });
       
-      if (permission.granted) {
-        await BubblePlugin.show({
-          image: "https://wordalastor04-dotcom.github.io/ymPlay/resources/icon.png",
-          text: "ymPlay"
-        });
-        alert("¡Isla Dinámica activada! Ve a WhatsApp o minimiza la app para verla.");
-        closeMenu();
-      } else {
-        alert("Debes permitir 'Mostrar sobre otras apps' en los ajustes de Android.");
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      // TRUCO: Si el plugin falla, activamos la notificación nativa en su lugar
-      if ('mediaSession' in navigator) {
-        alert("La burbuja no es compatible con este celular, pero se activó el panel de notificaciones.");
-      }
+      // B. Escuchar los botones de la notificación
+      await MediaSessionPlugin.setActionHandler({ action: 'play' }, () => playAudio());
+      await MediaSessionPlugin.setActionHandler({ action: 'pause' }, () => audio.pause());
+      await MediaSessionPlugin.setActionHandler({ action: 'previoustrack' }, () => prevTrack());
+      await MediaSessionPlugin.setActionHandler({ action: 'nexttrack' }, () => nextTrack());
+      
+      // C. Decirle a Android que muestre la notificación
+      await MediaSessionPlugin.setPlaybackState({ playbackState: 'playing' });
+      
+    } catch (e) {
+      console.warn("Error en plugin nativo de notificación:", e);
     }
-  });
+  } else if ('mediaSession' in navigator) {
+    // Respaldo por si se prueba en navegador web
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.name, artist: track.artist, album: 'ymPlay',
+      artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
+    });
+    navigator.mediaSession.setActionHandler('play', () => playAudio());
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
+    navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
+  }
 }
 
-document.addEventListener('floatingBubbleClick', () => {
-  abrirReproductor();
-});
-
 // ============================================================
-// ACTUALIZACIÓN Y VISTAS
+// 2. ACTUALIZACIÓN
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -133,6 +133,9 @@ async function checkForUpdates() {
 }
 if (closeUpdateBtn) closeUpdateBtn.onclick = () => updateBanner.classList.remove('show');
 
+// ============================================================
+// 3. CONTROL DE VISTAS Y PLAYLISTS
+// ============================================================
 function showView(viewName) {
   viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'none'; mainTabs.style.display = 'flex';
   if (viewName === 'songs') {
@@ -207,6 +210,9 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 });
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
+// ============================================================
+// 4. RENDERIZAR Y ESCANEAR MÚSICA
+// ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
@@ -265,6 +271,9 @@ function sortTracks(criteria) {
   closeMenu();
 }
 
+// ============================================================
+// 5. REPRODUCTOR (Conectar con Notificación)
+// ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
 
@@ -273,6 +282,7 @@ function cargarCancion(index) {
   currentIndex = index;
   const track = tracks[index];
   const playableUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.url) : track.url;
+  
   audio.src = playableUrl;
   
   if(songTitle) songTitle.textContent = track.name;
@@ -288,16 +298,8 @@ function cargarCancion(index) {
     coverImg.style.display = 'none';
   }
 
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.name, artist: track.artist, album: 'ymPlay',
-      artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-    });
-    navigator.mediaSession.setActionHandler('play', () => playAudio());
-    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
-    navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-  }
+  // Llamamos a la notificación nativa
+  setupMediaSession(track, coverUrl);
 
   resetProgress();
   playAudio();
@@ -313,6 +315,7 @@ function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 function prevTrack() { if (tracks.length) cargarCancion(currentIndex > 0 ? currentIndex - 1 : tracks.length - 1); }
 function nextTrack() { if (tracks.length) cargarCancion(currentIndex < tracks.length - 1 ? currentIndex + 1 : 0); }
 
+// Eventos para mantener la notificación sincronizada
 audio.addEventListener('loadedmetadata', () => { if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration); });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
@@ -322,11 +325,15 @@ audio.addEventListener('timeupdate', () => {
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
   setupAudioContext();
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  if (window.Capacitor?.Plugins?.MediaSession) {
+    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'playing' }).catch(()=>{});
+  }
 });
 audio.addEventListener('pause', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  if (window.Capacitor?.Plugins?.MediaSession) {
+    window.Capacitor.Plugins.MediaSession.setPlaybackState({ playbackState: 'paused' }).catch(()=>{});
+  }
 });
 audio.addEventListener('ended', nextTrack);
 
@@ -338,6 +345,9 @@ if (progressBar) {
   });
 }
 
+// ============================================================
+// 6. ECUALIZADOR, FONDO, TEMA Y NAVEGACIÓN
+// ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
