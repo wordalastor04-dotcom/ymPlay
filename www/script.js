@@ -13,7 +13,10 @@ let eqFilters = [];
 let isEqActive = false; 
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-const CURRENT_APP_VERSION = "1.1.2"; 
+// Variable para los modos: 'normal', 'repeat', 'shuffle'
+let playbackMode = 'normal'; 
+
+const CURRENT_APP_VERSION = "1.1.3"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -48,6 +51,11 @@ const miniPlayBtn = $('miniPlayBtn');
 const miniPrevBtn = $('miniPrevBtn');
 const miniNextBtn = $('miniNextBtn');
 const miniInfoBtn = $('miniInfoBtn');
+
+// Botones de modo
+const modeNormal = $('modeNormal');
+const modeRepeat = $('modeRepeat');
+const modeShuffle = $('modeShuffle');
 
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
@@ -98,31 +106,33 @@ let pressTimer;
 let wakeLock = null;
 
 // ============================================================
-// 1. SISTEMA ANTI-CORTES (WAKE LOCK)
+// 1. LÓGICA DE MODOS DE REPRODUCCIÓN
+// ============================================================
+function setPlaybackMode(mode) {
+    playbackMode = mode;
+    modeNormal.classList.remove('active');
+    modeRepeat.classList.remove('active');
+    modeShuffle.classList.remove('active');
+    
+    if (mode === 'normal') modeNormal.classList.add('active');
+    else if (mode === 'repeat') modeRepeat.classList.add('active');
+    else if (mode === 'shuffle') modeShuffle.classList.add('active');
+}
+
+modeNormal.addEventListener('click', () => setPlaybackMode('normal'));
+modeRepeat.addEventListener('click', () => setPlaybackMode('repeat'));
+modeShuffle.addEventListener('click', () => setPlaybackMode('shuffle'));
+
+// ============================================================
+// 2. SISTEMA ANTI-CORTES (WAKE LOCK)
 // ============================================================
 async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-    }
-  } catch (err) {}
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
-
-function releaseWakeLock() {
-  if (wakeLock !== null) {
-    wakeLock.release();
-    wakeLock = null;
-  }
-}
-
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && !audio.paused) {
-    await requestWakeLock(); 
-  }
-});
+function releaseWakeLock() { if (wakeLock !== null) { wakeLock.release(); wakeLock = null; } }
 
 // ============================================================
-// 2. MEMORIA Y CACHÉ
+// 3. MEMORIA Y CACHÉ
 // ============================================================
 function loadCachedTracks() {
   const cached = localStorage.getItem('ymPlay_tracks_cache');
@@ -132,11 +142,7 @@ function loadCachedTracks() {
     if (tracks.length > 0) renderPlaylist();
   }
 }
-
-function saveTracksCache() {
-  try { localStorage.setItem('ymPlay_tracks_cache', JSON.stringify(tracks)); } catch (e) {}
-}
-
+function saveTracksCache() { try { localStorage.setItem('ymPlay_tracks_cache', JSON.stringify(tracks)); } catch (e) {} }
 function guardarProgreso() {
   if (currentIndex !== -1 && tracks[currentIndex]) {
     localStorage.setItem('ymPlay_lastTrackUrl', tracks[currentIndex].url);
@@ -144,7 +150,6 @@ function guardarProgreso() {
     localStorage.setItem('ymPlay_isPlaying', !audio.paused);
   }
 }
-
 function restaurarSesion() {
   const lastUrl = localStorage.getItem('ymPlay_lastTrackUrl');
   const lastTime = parseFloat(localStorage.getItem('ymPlay_lastTime') || 0);
@@ -161,20 +166,10 @@ audio.addEventListener('pause', guardarProgreso);
 document.addEventListener('visibilitychange', () => { if (document.hidden) guardarProgreso(); });
 
 // ============================================================
-// 3. MENÚ DE CONTEXTO (MANTENER PRESIONADO)
+// 4. MENÚ DE CONTEXTO
 // ============================================================
-function showSelectionMenu(track) {
-  selectedTrackObj = track;
-  selectionMenu.classList.add('show');
-  sheetOverlay.classList.add('active');
-}
-
-function hideSelectionMenu() {
-  selectionMenu.classList.remove('show');
-  sheetOverlay.classList.remove('active');
-  selectedTrackObj = null;
-}
-
+function showSelectionMenu(track) { selectedTrackObj = track; selectionMenu.classList.add('show'); sheetOverlay.classList.add('active'); }
+function hideSelectionMenu() { selectionMenu.classList.remove('show'); sheetOverlay.classList.remove('active'); selectedTrackObj = null; }
 closeSelectionBtn.addEventListener('click', hideSelectionMenu);
 sheetOverlay.addEventListener('click', hideSelectionMenu);
 
@@ -226,9 +221,7 @@ ctxShare.addEventListener('click', async () => {
         url: fileUri.uri, 
         dialogTitle: 'Compartir con...'
       });
-    } catch (error) {
-      console.error(error); alert("Error al compartir el archivo.");
-    }
+    } catch (error) { console.error(error); alert("Error al compartir el archivo."); }
   } else { alert("Compila la nueva versión para compartir."); }
   hideSelectionMenu();
 });
@@ -250,7 +243,7 @@ ctxDelete.addEventListener('click', () => {
 });
 
 // ============================================================
-// 4. VISTAS Y PLAYLISTS
+// 5. VISTAS Y PLAYLISTS
 // ============================================================
 async function checkForUpdates() {
   try {
@@ -339,7 +332,7 @@ btnAddSongsToPlaylist.addEventListener('click', () => {
 closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.display = 'none'; renderPlaylistDetail(); });
 
 // ============================================================
-// 5. RENDERIZAR Y ESCANEAR (SIN FILTRO DE DURACIÓN)
+// 6. RENDERIZAR Y ESCANEAR
 // ============================================================
 function startPress(track) { pressTimer = setTimeout(() => { showSelectionMenu(track); }, 600); }
 function cancelPress() { clearTimeout(pressTimer); }
@@ -366,38 +359,25 @@ async function escanearMusicaNativa() {
   if (!window.Capacitor || !MediaStorePlugin) return;
   
   try {
-    if (tracks.length === 0) {
-      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
-    }
-    
+    if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>'; }
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
     const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
     
     if (listaAudios.length > 0) {
       const newTracks = listaAudios.map(song => ({
-        name: song.title || song.name || 'Desconocido',
-        artist: song.artist || 'Artista desconocido',
-        url: song.url || song.uri || song.path,
-        cover: song.albumArt || song.albumArtUri || song.cover || '',
+        name: song.title || song.name || 'Desconocido', artist: song.artist || 'Artista desconocido',
+        url: song.url || song.uri || song.path, cover: song.albumArt || song.albumArtUri || song.cover || '',
         dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0,
-        duration: song.duration || song.durationMs || 0,
-        hidden: false
-      })).filter(t => {
-        // AQUI ESTÁ LA CORRECCIÓN: Solo comprobamos que tenga URL, sin importar la duración
-        return t.url; 
-      });
+        duration: song.duration || song.durationMs || 0, hidden: false
+      })).filter(t => t.url);
 
       if (newTracks.length > 0) {
         const hiddenUrls = tracks.filter(t => t.hidden).map(t => t.url);
         tracks = newTracks.map(t => ({ ...t, hidden: hiddenUrls.includes(t.url) }));
         saveTracksCache(); sortTracks('newest'); restaurarSesion();
-      } else if (tracks.length === 0) { 
-        if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música válida.</li>'; 
-      }
-    } else if (tracks.length === 0) { 
-      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; 
-    }
+      } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música válida.</li>'; }
+    } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; }
   } catch (error) {}
 }
 
@@ -412,7 +392,7 @@ function sortTracks(criteria) {
 }
 
 // ============================================================
-// 6. REPRODUCTOR Y LÓGICA ANTI-CORTES
+// 7. REPRODUCTOR Y LÓGICA DE MODOS
 // ============================================================
 function openMenu() { if(sideMenu) sideMenu.classList.add('open'); if(menuOverlay) menuOverlay.classList.add('active'); }
 function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOverlay) menuOverlay.classList.remove('active'); }
@@ -474,6 +454,23 @@ function prevTrack() {
 
 function nextTrack() { 
   const queue = getActiveQueue(); if (queue.length === 0) return;
+  
+  // Si es modo aleatorio
+  if (playbackMode === 'shuffle') {
+    let randomIndex = Math.floor(Math.random() * queue.length);
+    // Si solo hay una canción, se queda en esa
+    if (queue.length > 1) {
+        // Evitar que suene la misma canción seguida
+        while (queue[randomIndex].url === tracks[currentIndex]?.url) {
+            randomIndex = Math.floor(Math.random() * queue.length);
+        }
+    }
+    const realIndex = tracks.findIndex(t => t.url === queue[randomIndex].url);
+    if (realIndex !== -1) cargarCancion(realIndex);
+    return;
+  }
+
+  // Modo normal
   const currentUrl = tracks[currentIndex]?.url; let qIndex = queue.findIndex(t => t.url === currentUrl);
   if (qIndex === -1) qIndex = -1; 
   const nextQIndex = (qIndex + 1) % queue.length;
@@ -518,7 +515,16 @@ audio.addEventListener('pause', () => {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   releaseWakeLock();
 });
-audio.addEventListener('ended', nextTrack);
+
+// AQUI SE CONTROL EL BUCLE DE UNA SOLA CANCIÓN
+audio.addEventListener('ended', () => {
+    if (playbackMode === 'repeat') {
+        audio.currentTime = 0;
+        playAudio();
+    } else {
+        nextTrack();
+    }
+});
 
 if (progressBar) {
   progressBar.addEventListener('click', e => {
@@ -529,7 +535,7 @@ if (progressBar) {
 }
 
 // ============================================================
-// 7. ECUALIZADOR (Solo se activa si el usuario lo toca)
+// 8. ECUALIZADOR
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
@@ -558,6 +564,24 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
 });
 
+// LÓGICA PARA APAGAR/RESETear EL ECUALIZADOR
+document.getElementById('eqResetBtn')?.addEventListener('click', () => {
+    // Poner todos los sliders en 0 y desactivar los presets visualmente
+    document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
+        slider.value = 0;
+        if (eqFilters[i]) eqFilters[i].gain.value = 0;
+    });
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.preset-btn[data-preset="flat"]').classList.add('active');
+    
+    // Si quieres apagar el ecualizador de verdad para ahorrar recursos, 
+    // desconectamos el nodo (pero el sonido seguirá saliendo por el canal principal)
+    isEqActive = false;
+});
+
+// ============================================================
+// 9. NAVEGACIÓN Y FONDO
+// ============================================================
 function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenMain) screenMain.style.display = 'flex'; }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; }
