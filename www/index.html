@@ -63,10 +63,10 @@
       </div>
 
       <div class="palette-switcher">
-        <div class="palette-dot active" data-color="ocean" title="Océano"></div>
-        <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
-        <div class="palette-dot" data-color="forest" title="Bosque"></div>
-        <div class="palette-dot" data-color="mono" title="Monocromo"></div>
+        <div class="palette-dot active" data-color="ocean"></div>
+        <div class="palette-dot" data-color="sunset"></div>
+        <div class="palette-dot" data-color="forest"></div>
+        <div class="palette-dot" data-color="mono"></div>
       </div>
 
       <div class="tabs-container" id="main-tabs">
@@ -74,7 +74,6 @@
         <button class="tab-btn-main" data-view="playlists">Playlists</button>
       </div>
 
-      <!-- VISTA: TODAS LAS CANCIONES -->
       <div id="view-songs" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
         <div style="display: flex; justify-content: center; margin-bottom: 15px;">
           <button id="btnEscanear" class="small-update-btn">Actualizar Música</button>
@@ -85,15 +84,11 @@
         </div>
       </div>
 
-      <!-- VISTA: MIS PLAYLISTS -->
       <div id="view-playlists" style="flex: 1; display: none; flex-direction: column; overflow-y: auto;">
-        <button id="btnNewPlaylist" class="add-playlist-btn">
-          <span>+</span> Crear nueva Playlist
-        </button>
+        <button id="btnNewPlaylist" class="add-playlist-btn"><span>+</span> Crear nueva Playlist</button>
         <ul class="playlist" id="playlists-list" style="margin-top: 15px;"></ul>
       </div>
 
-      <!-- VISTA: DETALLE DE UNA PLAYLIST -->
       <div id="view-playlist-detail" style="flex: 1; display: none; flex-direction: column; overflow: hidden;">
         <div class="top-bar" style="margin-bottom: 10px;">
           <div style="display: flex; align-items: center; gap: 10px;">
@@ -103,17 +98,13 @@
             <h2 id="playlistDetailTitle" style="font-size: 18px;">Playlist</h2>
           </div>
         </div>
-        <button id="btnAddSongsToPlaylist" class="small-update-btn" style="margin: 0 auto 15px auto; display: block;">
-          + Añadir canciones
-        </button>
+        <button id="btnAddSongsToPlaylist" class="small-update-btn" style="margin: 0 auto 15px auto; display: block;">+ Añadir canciones</button>
         <div class="playlist-section" style="flex: 1; overflow-y: auto;">
           <ul class="playlist" id="playlist-detail-list"></ul>
         </div>
       </div>
 
-      <!-- ========================================== -->
-      <!-- MINI REPRODUCTOR (RESTAURADO)              -->
-      <!-- ========================================== -->
+      <!-- MINI REPRODUCTOR -->
       <div id="mini-player" class="mini-player" style="display: none;">
         <img id="miniCover" src="" alt="Portada" class="mini-cover">
         <div class="mini-info" id="miniInfoBtn">
