@@ -64,6 +64,19 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+/* ===== FONDO PERSONALIZADO DE LA APP ===== */
+#custom-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.2;
+  display: none;
+  pointer-events: none;
+}
+body.has-custom-bg #custom-bg { display: block; }
+
 /* ===== CONTENEDOR PRINCIPAL ===== */
 .player-app {
   width: 100%;
@@ -200,38 +213,32 @@ body {
   color: var(--text-primary); border-radius: 30px; font-size: 13px; cursor: pointer;
 }
 
+/* ESTO ES LO QUE OCULTA EL TEXTO FEO DE "SELECCIONAR ARCHIVO" */
+.file-label input, .bg-label input {
+  display: none;
+}
+
 /* =========================================
-   REPRODUCTOR (AQUÍ ESTÁ EL ARREGLO DE LA FOTO)
+   REPRODUCTOR (FOTO EN GRANDE)
    ========================================= */
 .cover-container {
-  position: relative; 
-  width: 100%; 
-  aspect-ratio: 1 / 1;
-  max-height: 260px; 
-  margin: 10px auto; 
-  border-radius: 20px;
-  overflow: hidden; 
-  background: var(--bg-card-solid);
+  position: relative; width: 100%; aspect-ratio: 1 / 1;
+  max-height: 260px; margin: 10px auto; border-radius: 20px;
+  overflow: hidden; background: var(--bg-card-solid);
   box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.4);
 }
 
-/* El ícono y la foto están superpuestos en el mismo lugar */
 .cover-container .cover-placeholder {
-  position: absolute;
-  top: 0; left: 0;
+  position: absolute; top: 0; left: 0;
   width: 100%; height: 100%; 
   display: flex; align-items: center; justify-content: center;
-  font-size: 80px; opacity: 0.3;
-  z-index: 1;
+  font-size: 80px; opacity: 0.3; z-index: 1;
 }
 
 .cover-container img { 
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%; 
-  object-fit: cover; 
-  z-index: 2; /* La foto tapa al ícono */
-  display: none;
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%; object-fit: cover; 
+  z-index: 2; display: none;
 }
 
 .cover-badge {
