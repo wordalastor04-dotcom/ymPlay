@@ -6,7 +6,7 @@
     "@capacitor/android": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@odion-cloud/capacitor-mediastore": "^1.0.21",
-    "@capgo/capacitor-media-session": "^1.0.0"
+    "@capawesome-team/capacitor-media-session": "^0.1.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0"
