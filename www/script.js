@@ -1,5 +1,5 @@
 // ============================================================
-// 1. CONFIGURACIÓN E IMPORTACIÓN DEL PLUGIN NATIVO
+// 1. CONFIGURACIÓN
 // ============================================================
 const audio = new Audio();
 audio.crossOrigin = "anonymous";
@@ -33,6 +33,7 @@ const totalTimeEl = $('totalTime');
 const coverImg = $('coverImg');
 const coverBadge = $('coverBadge');
 const backToListBtn = $('backToListBtn');
+const bgInput = $('bgInput'); // Botón de cambiar fondo
 
 const menuBtn = $('menuBtn');
 const sideMenu = $('side-menu');
@@ -74,7 +75,7 @@ async function escanearMusicaNativa() {
 }
 
 // ============================================================
-// 4. RENDERIZAR LISTA (AQUÍ ESTÁ EL ARREGLO)
+// 4. RENDERIZAR LISTA
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
@@ -101,18 +102,18 @@ function renderPlaylist() {
     li.addEventListener('click', () => {
       const idx = parseInt(li.dataset.index);
       
-      // LA MAGIA ESTÁ AQUÍ: Si es la misma canción, no la reinicies
+      // No reiniciar si es la misma canción
       if (idx !== currentIndex) {
         cargarCancion(idx);
       }
       
-      abrirReproductor(); // Abre el menú de reproducción
+      abrirReproductor();
     });
   });
 }
 
 // ============================================================
-// 5. LÓGICA DE ORDENAMIENTO Y MENÚ
+// 5. ORDENAMIENTO Y MENÚ
 // ============================================================
 function sortTracks(criteria) {
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
@@ -146,9 +147,9 @@ function cargarCancion(index) {
   if (track.cover && coverImg) {
     coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
     coverImg.src = coverUrl;
-    coverImg.style.display = 'block';
+    coverImg.style.display = 'block'; // Muestra la foto
   } else if (coverImg) {
-    coverImg.style.display = 'none';
+    coverImg.style.display = 'none'; // Oculta la foto si no hay
   }
 
   updateMediaSession(track, coverUrl);
@@ -246,7 +247,7 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
   });
 });
 
-// NAVEGACIÓN Y UTILIDADES
+// NAVEGACIÓN
 function abrirReproductor() { if(screenPlaylist) screenPlaylist.style.display = 'none'; if(screenPlayer) screenPlayer.style.display = 'flex'; }
 function volverALista() { if(screenPlayer) screenPlayer.style.display = 'none'; if(screenPlaylist) screenPlaylist.style.display = 'flex'; renderPlaylist(); }
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
@@ -273,6 +274,22 @@ if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('olde
 if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 if(btnEscanear) btnEscanear.addEventListener('click', (e) => { e.preventDefault(); escanearMusicaNativa(); });
 
+// LÓGICA DEL FONDO PERSONALIZADO
+if (bgInput) {
+  bgInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      const customBg = document.getElementById('custom-bg');
+      if (customBg) {
+        customBg.style.backgroundImage = `url(${url})`;
+        document.body.classList.add('has-custom-bg');
+      }
+    }
+  });
+}
+
+// CAMBIO DE TEMA
 const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) {
   themeBtn.addEventListener('click', () => {
@@ -281,6 +298,7 @@ if (themeBtn) {
   });
 }
 
+// CAMBIO DE PALETA
 document.querySelectorAll('.palette-dot').forEach(dot => {
   dot.addEventListener('click', () => {
     document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
@@ -289,6 +307,7 @@ document.querySelectorAll('.palette-dot').forEach(dot => {
   });
 });
 
+// INICIALIZACIÓN
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => { escanearMusicaNativa(); }, 1500);
 });
