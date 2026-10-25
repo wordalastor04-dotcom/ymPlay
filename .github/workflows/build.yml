@@ -1,64 +1,143 @@
-name: Compilar APK Firmado
-on: [push]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+<!DOCTYPE html>
+<html lang="es" data-theme="dark" data-palette="ocean">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ymPlay</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '21'
+  <div id="custom-bg"></div>
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+  <!-- MENÚ LATERAL -->
+  <div id="side-menu" class="side-menu">
+    <div class="menu-header">
+      <h2>Opciones</h2>
+      <button class="icon-btn" id="closeMenuBtn">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <ul class="menu-list">
+      <li><button id="sortNewestBtn">⬇️ Más recientes primero</button></li>
+      <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
+      <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
+    </ul>
+  </div>
+  <div id="menu-overlay" class="menu-overlay"></div>
 
-      - name: Install dependencies
-        run: npm install
+  <div class="player-app">
+    
+    <!-- PANTALLA 1: LISTA -->
+    <div id="screen-playlist" style="display: flex; flex-direction: column; height: 100%;">
+      
+      <div class="top-bar">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="icon-btn" id="menuBtn">
+            <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+          </button>
+          <h1>ymPlay</h1>
+        </div>
+        <div class="top-actions">
+          <!-- BOTÓN DEL TEMA -->
+          <button class="icon-btn" id="themeToggle" title="Cambiar modo">
+            <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+          </button>
+        </div>
+      </div>
 
-      - name: Add Android platform
-        run: npx cap add android
+      <!-- BOTONES DE COLORES -->
+      <div class="palette-switcher">
+        <div class="palette-dot active" data-color="ocean" title="Océano"></div>
+        <div class="palette-dot" data-color="sunset" title="Atardecer"></div>
+        <div class="palette-dot" data-color="forest" title="Bosque"></div>
+        <div class="palette-dot" data-color="mono" title="Monocromo"></div>
+      </div>
 
-      - name: Add audio permissions to Manifest
-        run: |
-          sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/><\/manifest>/' android/app/src/main/AndroidManifest.xml
+      <div class="playlist-section" style="flex: 1; overflow-y: auto;">
+        <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
+        <ul class="playlist" id="playlist"></ul>
+      </div>
 
-      - name: Sync Capacitor
-        run: npx cap sync
+      <div class="bottom-actions" style="margin-top: auto; padding-top: 10px;">
+        <label class="file-label" id="btnEscanear">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>
+          Actualizar Música
+        </label>
+        <label class="bg-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4z"/></svg>
+          Fondo
+          <input type="file" id="bgInput" accept="image/*" />
+        </label>
+      </div>
+    </div>
 
-      - name: Build debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug
+    <!-- PANTALLA 2: REPRODUCTOR -->
+    <div id="screen-player" style="display: none; flex-direction: column; height: 100%;">
+      <div class="top-bar" style="justify-content: flex-start; margin-bottom: 10px;">
+        <button class="icon-btn" id="backToListBtn" style="margin-right: 10px;">
+          <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z"/></svg>
+        </button>
+        <h1 style="font-size: 16px;">Reproduciendo</h1>
+      </div>
 
-      - name: Extract signing key
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
+      <div class="cover-container">
+        <div class="cover-placeholder">🎵</div>
+        <img id="coverImg" src="" alt="Portada" style="display:none;" />
+        <span class="cover-badge" id="coverBadge">Pista</span>
+      </div>
 
-      - name: Sign APK with apksigner
-        run: |
-          # Buscar la carpeta de herramientas de Android
-          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
-          
-          # 1. Alinear el APK (obligatorio antes de firmar)
-          $BUILD_TOOLS_DIR/zipalign -v -p 4 android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/app-debug-aligned.apk
-          
-          # 2. Firmar con apksigner (aplica v1, v2 y v3 automáticamente)
-          $BUILD_TOOLS_DIR/apksigner sign --ks android/release.p12 \
-            --ks-type PKCS12 \
-            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
-            --ks-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --key-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --out android/app/build/outputs/apk/debug/app-debug-signed.apk \
-            android/app/build/outputs/apk/debug/app-debug-aligned.apk
+      <div class="song-info">
+        <div class="song-title" id="songTitle">Selecciona una canción</div>
+        <div class="song-artist" id="songArtist">—</div>
+      </div>
 
-      - name: Upload signed APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ymPlay-APK
-          path: android/app/build/outputs/apk/debug/app-debug-signed.apk
+      <div class="progress-section">
+        <div class="progress-bar-wrap" id="progressBar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="time-labels">
+          <span id="currentTime">0:00</span>
+          <span id="totalTime">0:00</span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-btn" id="prevBtn"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+        <button class="ctrl-btn play-btn" id="playBtn"><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+        <button class="ctrl-btn" id="nextBtn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+      </div>
+
+      <div class="tab-bar" style="margin-top: 10px;">
+        <button class="tab-btn active" data-tab="lyrics">Letras</button>
+        <button class="tab-btn" data-tab="eq">Ecualizador</button>
+      </div>
+
+      <div class="tab-content active" id="tab-lyrics">
+        <div class="lyrics-box" id="lyricsBox"><p>Sin letras disponibles</p></div>
+      </div>
+
+      <div class="tab-content" id="tab-eq">
+        <div class="eq-container">
+          <div class="eq-presets" id="eqPresets">
+            <button class="preset-btn active" data-preset="flat">Plano</button>
+            <button class="preset-btn" data-preset="rock">Rock</button>
+            <button class="preset-btn" data-preset="pop">Pop</button>
+            <button class="preset-btn" data-preset="jazz">Jazz</button>
+            <button class="preset-btn" data-preset="vocal">Voz</button>
+          </div>
+          <div class="eq-sliders" id="eqSliders">
+            <div class="eq-band"><label>60Hz</label><input type="range" min="-12" max="12" value="0" data-freq="60" /></div>
+            <div class="eq-band"><label>250Hz</label><input type="range" min="-12" max="12" value="0" data-freq="250" /></div>
+            <div class="eq-band"><label>1kHz</label><input type="range" min="-12" max="12" value="0" data-freq="1000" /></div>
+            <div class="eq-band"><label>4kHz</label><input type="range" min="-12" max="12" value="0" data-freq="4000" /></div>
+            <div class="eq-band"><label>14kHz</label><input type="range" min="-12" max="12" value="0" data-freq="14000" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
