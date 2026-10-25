@@ -1,10 +1,11 @@
 // ============================================================
-// 1. CONFIGURACIÓN Y VARIABLES GLOBALES
+// 1. CONFIGURACIÓN E IMPORTACIÓN DEL PLUGIN NATIVO
 // ============================================================
 const audio = new Audio();
 audio.crossOrigin = "anonymous";
 let tracks = [];
 let currentIndex = -1;
+let isPlaying = false;
 
 let audioCtx = null;
 let sourceNode = null;
@@ -12,7 +13,7 @@ let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 // ============================================================
-// 2. REFERENCIAS DOM
+// 2. REFERENCIAS DOM (Búsqueda segura de elementos)
 // ============================================================
 const $ = id => document.getElementById(id);
 
@@ -54,12 +55,12 @@ async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
 
   if (!window.Capacitor || !MediaStorePlugin) {
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Escaneo solo disponible en el APK.</li>';
     return;
   }
 
   try {
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando música...</li>';
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
 
     const result = await MediaStorePlugin.getMediasByType({ 
@@ -77,7 +78,6 @@ async function escanearMusicaNativa() {
           artist: song.artist || 'Artista desconocido',
           url: song.url || song.uri || song.path,
           cover: song.albumArt || song.albumArtUri || song.cover || '',
-          // Guardamos la fecha de modificación o creación para poder ordenar
           dateAdded: song.dateAdded || song.date_added || song.dateModified || song.id || 0
         };
       }).filter(t => t.url);
@@ -85,11 +85,11 @@ async function escanearMusicaNativa() {
       // Por defecto, ordenamos por los más recientes
       sortTracks('newest');
     } else {
-      playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
+      if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>';
     }
   } catch (error) {
     console.error("Error al escanear:", error);
-    playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos. Revisa los permisos.</li>';
+    if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Error al leer archivos.</li>';
   }
 }
 
@@ -97,6 +97,7 @@ async function escanearMusicaNativa() {
 // 4. RENDERIZAR LISTA (CON PORTADAS)
 // ============================================================
 function renderPlaylist() {
+  if (!playlistEl) return;
   if (trackCount) trackCount.textContent = `${tracks.length} pistas`;
   
   if (tracks.length === 0) {
@@ -105,7 +106,6 @@ function renderPlaylist() {
   }
 
   playlistEl.innerHTML = tracks.map((t, i) => {
-    // Convertir la portada para que se vea en el WebView
     let displayCover = '';
     if (t.cover) {
       displayCover = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : t.cover;
@@ -124,7 +124,6 @@ function renderPlaylist() {
     `;
   }).join('');
 
-  // Evento al tocar una canción
   playlistEl.querySelectorAll('li').forEach(li => {
     li.addEventListener('click', () => {
       const idx = parseInt(li.dataset.index);
@@ -138,7 +137,6 @@ function renderPlaylist() {
 // 5. LÓGICA DE ORDENAMIENTO Y MENÚ
 // ============================================================
 function sortTracks(criteria) {
-  // Guardamos la canción actual para no perderla al ordenar
   const currentTrackUrl = currentIndex !== -1 && tracks[currentIndex] ? tracks[currentIndex].url : null;
 
   if (criteria === 'newest') {
@@ -149,7 +147,6 @@ function sortTracks(criteria) {
     tracks.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // Actualizamos el currentIndex a la nueva posición de la canción
   if (currentTrackUrl) {
     currentIndex = tracks.findIndex(t => t.url === currentTrackUrl);
   }
@@ -168,15 +165,6 @@ function closeMenu() {
   if(menuOverlay) menuOverlay.classList.remove('active');
 }
 
-// Eventos del menú
-if(menuBtn) menuBtn.addEventListener('click', openMenu);
-if(closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
-if(menuOverlay) menuOverlay.addEventListener('click', closeMenu);
-
-if(sortNewestBtn) sortNewestBtn.addEventListener('click', () => sortTracks('newest'));
-if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('oldest'));
-if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
-
 // ============================================================
 // 6. REPRODUCTOR Y REPRODUCCIÓN DE AUDIO
 // ============================================================
@@ -185,7 +173,6 @@ function cargarCancion(index) {
   currentIndex = index;
   const track = tracks[index];
 
-  // Convertir la ruta del audio para que el WebView la pueda reproducir
   const playableUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.url) : track.url;
   audio.src = playableUrl;
   
@@ -193,7 +180,6 @@ function cargarCancion(index) {
   if(songArtist) songArtist.textContent = track.artist;
   if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
 
-  // Convertir la portada grande
   if (track.cover && coverImg) {
     coverImg.src = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
     coverImg.style.display = 'block';
@@ -229,7 +215,7 @@ function nextTrack() {
 }
 
 // ============================================================
-// 7. EVENTOS DE AUDIO Y ECUALIZADOR
+// 7. EVENTOS DE AUDIO, PROGRESO Y ECUALIZADOR
 // ============================================================
 audio.addEventListener('loadedmetadata', () => {
   if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration);
@@ -263,7 +249,7 @@ if (progressBar) {
 }
 
 function setupAudioContext() {
-  if (sourceNode) return; // Evitar silenciar el audio
+  if (sourceNode) return; 
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     sourceNode = audioCtx.createMediaElementSource(audio);
@@ -280,9 +266,7 @@ function setupAudioContext() {
     let prev = sourceNode;
     eqFilters.forEach(f => { prev.connect(f); prev = f; });
     prev.connect(audioCtx.destination);
-  } catch (e) {
-    console.log("Ecualizador no inicializado:", e);
-  }
+  } catch (e) {}
 }
 
 document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
@@ -312,7 +296,7 @@ document.getElementById('eqPresets')?.addEventListener('click', e => {
 });
 
 // ============================================================
-// 8. NAVEGACIÓN Y PESTAÑAS
+// 8. NAVEGACIÓN, PESTAÑAS Y UTILIDADES
 // ============================================================
 function abrirReproductor() {
   if(screenPlaylist) screenPlaylist.style.display = 'none';
@@ -322,7 +306,7 @@ function abrirReproductor() {
 function volverALista() {
   if(screenPlayer) screenPlayer.style.display = 'none';
   if(screenPlaylist) screenPlaylist.style.display = 'flex';
-  renderPlaylist(); // Refrescar lista para actualizar la canción activa
+  renderPlaylist();
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -334,9 +318,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ============================================================
-// 9. UTILIDADES E INICIALIZACIÓN
-// ============================================================
 function resetProgress() {
   if(progressFill) progressFill.style.width = '0%';
   if(currentTimeEl) currentTimeEl.textContent = '0:00';
@@ -350,11 +331,21 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// Asignación de eventos a botones
+// ============================================================
+// 9. ASIGNACIÓN DE EVENTOS (BOTONES)
+// ============================================================
 if(playBtn) playBtn.addEventListener('click', togglePlay);
 if(prevBtn) prevBtn.addEventListener('click', prevTrack);
 if(nextBtn) nextBtn.addEventListener('click', nextTrack);
 if(backToListBtn) backToListBtn.addEventListener('click', volverALista);
+
+if(menuBtn) menuBtn.addEventListener('click', openMenu);
+if(closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
+if(menuOverlay) menuOverlay.addEventListener('click', closeMenu);
+
+if(sortNewestBtn) sortNewestBtn.addEventListener('click', () => sortTracks('newest'));
+if(sortOldestBtn) sortOldestBtn.addEventListener('click', () => sortTracks('oldest'));
+if(sortTitleBtn) sortTitleBtn.addEventListener('click', () => sortTracks('title'));
 
 if(btnEscanear) {
   btnEscanear.addEventListener('click', (e) => {
@@ -363,8 +354,35 @@ if(btnEscanear) {
   });
 }
 
-// Arrancar la app
+// ============================================================
+// 10. CAMBIO DE TEMA Y PALETA DE COLORES (¡El arreglo!)
+// ============================================================
+// Botón de Tema (Oscuro/Claro)
+const themeBtn = document.getElementById('themeToggle');
+if (themeBtn) {
+  themeBtn.addEventListener('click', () => {
+    const html = document.documentElement;
+    const currentTheme = html.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', newTheme);
+  });
+}
+
+// Botones de Colores (Paleta)
+document.querySelectorAll('.palette-dot').forEach(dot => {
+  dot.addEventListener('click', () => {
+    document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
+    dot.classList.add('active');
+    const color = dot.dataset.color;
+    document.documentElement.setAttribute('data-palette', color);
+  });
+});
+
+// ============================================================
+// 11. ARRANQUE DE LA APP
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Retraso para permitir que Android solicite los permisos
   setTimeout(() => {
     escanearMusicaNativa();
   }, 1500);
