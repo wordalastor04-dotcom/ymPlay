@@ -1,248 +1,74 @@
-<!DOCTYPE html>
-<html lang="es" data-theme="dark" data-palette="ocean">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ymPlay</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
+name: Compilar APK Firmado
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-  <div id="custom-bg"></div>
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
 
-  <!-- BANNER DE ACTUALIZACIÓN -->
-  <div id="update-banner" class="update-banner">
-    <span>✨ ¡Nueva actualización disponible!</span>
-    <button id="downloadUpdateBtn">Descargar</button>
-    <button id="closeUpdateBtn" class="close-update">✕</button>
-  </div>
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-  <!-- MENÚ LATERAL -->
-  <div id="side-menu" class="side-menu">
-    <div class="menu-header">
-      <h2>Opciones</h2>
-      <button class="icon-btn" id="closeMenuBtn">
-        <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-      </button>
-    </div>
-    <ul class="menu-list">
-      <li><button id="sortNewestBtn">⬇️ Más recientes primero</button></li>
-      <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
-      <li><button id="sortTitleBtn">🔤 Orden alfabético (A-Z)</button></li>
-      <li>
-        <label class="menu-btn" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-          🖼️ Cambiar Fondo
-          <input type="file" id="bgInput" accept="image/*" style="display: none;">
-        </label>
-      </li>
-    </ul>
-    <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-      <label style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; display: block;">Desenfoque de fondo:</label>
-      <input type="range" id="bgBlurSlider" min="0" max="20" value="0" step="1" style="width: 100%; accent-color: var(--accent);">
-    </div>
-  </div>
-  <div id="menu-overlay" class="menu-overlay"></div>
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
 
-  <div class="player-app">
-    
-    <!-- PANTALLA PRINCIPAL -->
-    <div id="screen-main" style="display: flex; flex-direction: column; height: 100%;">
-      
-      <div class="top-bar">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <button class="icon-btn" id="menuBtn">
-            <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
-          </button>
-          <h1 id="appTitle">ymPlay</h1>
-        </div>
-        <div class="top-actions">
-          <button class="icon-btn" id="themeToggle" title="Cambiar modo">
-            <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
-          </button>
-        </div>
-      </div>
+      - name: Add Android platform
+        run: npx cap add android
 
-      <div class="palette-switcher">
-        <div class="palette-dot active" data-color="ocean"></div>
-        <div class="palette-dot" data-color="sunset"></div>
-        <div class="palette-dot" data-color="forest"></div>
-        <div class="palette-dot" data-color="mono"></div>
-      </div>
+      - name: Generar Íconos y Splash
+        run: npx @capacitor/assets generate --android
 
-      <div class="tabs-container" id="main-tabs">
-        <button class="tab-btn-main active" data-view="songs">Canciones</button>
-        <button class="tab-btn-main" data-view="playlists">Playlists</button>
-      </div>
+      - name: Sync Capacitor
+        run: npx cap sync
 
-      <div id="view-songs" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-        <div style="display: flex; justify-content: center; margin-bottom: 15px;">
-          <button id="btnEscanear" class="small-update-btn">Actualizar Música</button>
-        </div>
-        <div class="playlist-section" style="flex: 1; overflow-y: auto;">
-          <h3 style="padding: 0 10px;">Canciones <span id="trackCount" style="font-weight:400;font-size:11px;color:var(--text-secondary);">Cargando...</span></h3>
-          <ul class="playlist" id="playlist"></ul>
-        </div>
-      </div>
+      - name: Add all required permissions to Manifest
+        run: |
+          # Permisos para Android nuevo (13+) y Android viejo (12-)
+          sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
 
-      <div id="view-playlists" style="flex: 1; display: none; flex-direction: column; overflow-y: auto;">
-        <button id="btnNewPlaylist" class="add-playlist-btn"><span>+</span> Crear nueva Playlist</button>
-        <ul class="playlist" id="playlists-list" style="margin-top: 15px;"></ul>
-      </div>
+      - name: Configure FileProvider for Sharing
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          echo '<?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <cache-path name="cache" path="." />
+              <external-path name="external" path="." />
+              <external-files-path name="external_files" path="." />
+              <files-path name="files" path="." />
+          </paths>' > android/app/src/main/res/xml/file_paths.xml
 
-      <div id="view-playlist-detail" style="flex: 1; display: none; flex-direction: column; overflow: hidden;">
-        <div class="top-bar" style="margin-bottom: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <button class="icon-btn" id="backToPlaylistsBtn">
-              <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z"/></svg>
-            </button>
-            <h2 id="playlistDetailTitle" style="font-size: 18px;">Playlist</h2>
-          </div>
-        </div>
-        <button id="btnAddSongsToPlaylist" class="small-update-btn" style="margin: 0 auto 15px auto; display: block;">+ Añadir canciones</button>
-        <div class="playlist-section" style="flex: 1; overflow-y: auto;">
-          <ul class="playlist" id="playlist-detail-list"></ul>
-        </div>
-      </div>
+      - name: Build debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
 
-      <!-- MINI REPRODUCTOR -->
-      <div id="mini-player" class="mini-player" style="display: none;">
-        <img id="miniCover" src="" alt="Portada" class="mini-cover">
-        <div class="mini-info" id="miniInfoBtn">
-          <span id="miniTitle">Canción</span>
-          <span id="miniArtist">Artista</span>
-        </div>
-        <div class="mini-controls">
-          <button id="miniPrevBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
-          <button id="miniPlayBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-          <button id="miniNextBtn" class="mini-btn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
-        </div>
-      </div>
+      - name: Extract signing key
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
 
-    </div>
+      - name: Sign APK with apksigner
+        run: |
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          $BUILD_TOOLS_DIR/zipalign -v -p 4 android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/app-debug-aligned.apk
+          $BUILD_TOOLS_DIR/apksigner sign --ks android/release.p12 \
+            --ks-type PKCS12 \
+            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            --ks-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --key-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            --out android/app/build/outputs/apk/debug/app-debug-signed.apk \
+            android/app/build/outputs/apk/debug/app-debug-aligned.apk
 
-    <!-- PANTALLA REPRODUCTOR COMPLETO -->
-    <div id="screen-player" style="display: none; flex-direction: column; height: 100%;">
-      <div class="top-bar" style="justify-content: flex-start; margin-bottom: 10px;">
-        <button class="icon-btn" id="backToListBtn" style="margin-right: 10px;">
-          <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z"/></svg>
-        </button>
-        <h1 style="font-size: 16px;">Reproduciendo</h1>
-      </div>
-
-      <div class="cover-container">
-        <div class="cover-placeholder">🎵</div>
-        <img id="coverImg" src="" alt="Portada" style="display:none;" />
-        <span class="cover-badge" id="coverBadge">Pista</span>
-      </div>
-
-      <div class="song-info">
-        <div class="song-title" id="songTitle">Selecciona una canción</div>
-        <div class="song-artist" id="songArtist">—</div>
-      </div>
-
-      <div class="progress-section">
-        <div class="progress-bar-wrap" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-        <div class="time-labels"><span id="currentTime">0:00</span><span id="totalTime">0:00</span></div>
-      </div>
-
-      <div class="controls">
-        <button class="ctrl-btn" id="prevBtn"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
-        <button class="ctrl-btn play-btn" id="playBtn"><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-        <button class="ctrl-btn" id="nextBtn"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
-      </div>
-
-      <div class="tab-bar" style="margin-top: 10px;">
-        <button class="tab-btn active" data-tab="lyrics">Letras</button>
-        <button class="tab-btn" data-tab="eq">Ecualizador</button>
-      </div>
-      <div class="tab-content active" id="tab-lyrics"><div class="lyrics-box" id="lyricsBox"><p>Sin letras disponibles</p></div></div>
-      <div class="tab-content" id="tab-eq">
-        <div class="eq-container">
-          <div class="eq-presets" id="eqPresets">
-            <button class="preset-btn active" data-preset="flat">Plano</button>
-            <button class="preset-btn" data-preset="rock">Rock</button>
-            <button class="preset-btn" data-preset="pop">Pop</button>
-            <button class="preset-btn" data-preset="jazz">Jazz</button>
-            <button class="preset-btn" data-preset="vocal">Voz</button>
-          </div>
-          <div class="eq-sliders" id="eqSliders">
-            <div class="eq-band"><label>60Hz</label><input type="range" min="-12" max="12" value="0" data-freq="60" /></div>
-            <div class="eq-band"><label>250Hz</label><input type="range" min="-12" max="12" value="0" data-freq="250" /></div>
-            <div class="eq-band"><label>1kHz</label><input type="range" min="-12" max="12" value="0" data-freq="1000" /></div>
-            <div class="eq-band"><label>4kHz</label><input type="range" min="-12" max="12" value="0" data-freq="4000" /></div>
-            <div class="eq-band"><label>14kHz</label><input type="range" min="-12" max="12" value="0" data-freq="14000" /></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- MENÚ DE SELECCIÓN (MANTENER PRESIONADO)    -->
-  <!-- ========================================== -->
-  <div id="selection-menu" class="bottom-sheet">
-    <div class="sheet-header">
-      <span id="selection-count">1 seleccionado</span>
-      <button class="icon-btn" id="closeSelectionBtn" style="width: 30px; height: 30px;">
-        <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-      </button>
-    </div>
-    <div class="sheet-actions">
-      <button class="sheet-btn" id="ctxAddTo">
-        <svg viewBox="0 0 24 24"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
-        <span>Agregar a</span>
-      </button>
-      <button class="sheet-btn" id="ctxPlayNext">
-        <svg viewBox="0 0 24 24"><path d="M3 18h12v-2H3v2zm0-4h12v-2H3v2zm0-4h12V8H3v2zm14-6v12l5-6-5-6z"/></svg>
-        <span>Reproducir a continuación</span>
-      </button>
-      <button class="sheet-btn" id="ctxShare">
-        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-        <span>Compartir</span>
-      </button>
-      <button class="sheet-btn" id="ctxHide">
-        <svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-        <span>Ocultar</span>
-      </button>
-      <button class="sheet-btn" id="ctxDelete" style="color: #ff4d4d;">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        <span>Borrar</span>
-      </button>
-    </div>
-  </div>
-  <div id="sheet-overlay" class="menu-overlay"></div>
-
-  <!-- MODALES -->
-  <div id="modal-new-playlist" class="modal-overlay" style="display: none;">
-    <div class="modal-content">
-      <h3>Nueva Playlist</h3>
-      <input type="text" id="newPlaylistName" placeholder="Nombre..." maxlength="30">
-      <div class="modal-actions">
-        <button id="cancelNewPlaylist" class="btn-secondary">Cancelar</button>
-        <button id="saveNewPlaylist" class="btn-primary">Crear</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-select-songs" class="modal-overlay" style="display: none;">
-    <div class="modal-content" style="height: 80%; display: flex; flex-direction: column;">
-      <h3>Añadir canciones</h3>
-      <ul id="all-songs-options" class="playlist" style="flex: 1; overflow-y: auto; margin-bottom: 15px;"></ul>
-      <button id="closeAddSongsModal" class="btn-primary" style="width: 100%;">Listo</button>
-    </div>
-  </div>
-
-  <!-- MODAL PARA AÑADIR A PLAYLIST DESDE EL MENÚ CONTEXTUAL -->
-  <div id="modal-ctx-playlists" class="modal-overlay" style="display: none;">
-    <div class="modal-content">
-      <h3>Añadir a Playlist</h3>
-      <ul id="ctx-playlist-options" class="playlist" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px;"></ul>
-      <div class="modal-actions">
-        <button id="cancelCtxPlaylist" class="btn-secondary">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="script.js"></script>
-</body>
-</html>
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ymPlay-APK
+          path: android/app/build/outputs/apk/debug/app-debug-signed.apk
