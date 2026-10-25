@@ -9,7 +9,7 @@ let sourceNode = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-const CURRENT_APP_VERSION = "1.0.9"; 
+const CURRENT_APP_VERSION = "1.1.0"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -77,7 +77,7 @@ const allSongsOptions = $('all-songs-options');
 const btnAddSongsToPlaylist = $('btnAddSongsToPlaylist');
 const closeAddSongsModal = $('closeAddSongsModal');
 
-// Elementos del Menú de Contexto
+// Menú de Contexto (Mantener presionado)
 const selectionMenu = $('selection-menu');
 const sheetOverlay = $('sheet-overlay');
 const closeSelectionBtn = $('closeSelectionBtn');
@@ -185,7 +185,6 @@ ctxPlayNext.addEventListener('click', () => {
   if (!selectedTrackObj) return;
   const idx = tracks.findIndex(t => t.url === selectedTrackObj.url);
   if (idx > -1 && currentIndex > -1) {
-    // Mover la canción justo después de la actual
     const trackToMove = tracks.splice(idx, 1)[0];
     tracks.splice(currentIndex + 1, 0, trackToMove);
     saveTracksCache();
@@ -194,10 +193,27 @@ ctxPlayNext.addEventListener('click', () => {
   hideSelectionMenu();
 });
 
-// C) Compartir
-ctxShare.addEventListener('click', () => {
+// C) Compartir (Nativo de Android)
+ctxShare.addEventListener('click', async () => {
   if (!selectedTrackObj) return;
-  if (navigator.share) {
+
+  const SharePlugin = window.Capacitor?.Plugins?.Share;
+
+  if (SharePlugin) {
+    try {
+      // Intenta compartir pasando la URI directa del archivo
+      await SharePlugin.share({
+        title: 'Compartir canción',
+        text: `Escuchando: ${selectedTrackObj.name} - ${selectedTrackObj.artist}`,
+        url: selectedTrackObj.url,
+        dialogTitle: 'Compartir con...'
+      });
+    } catch (error) {
+      console.error("Error al compartir:", error);
+      alert("No se pudo compartir el archivo directamente. Asegúrate de tener los permisos.");
+    }
+  } else if (navigator.share) {
+    // Respaldo web
     navigator.share({
       title: 'ymPlay',
       text: `Escuchando: ${selectedTrackObj.name} - ${selectedTrackObj.artist}`,
@@ -213,16 +229,15 @@ ctxHide.addEventListener('click', () => {
   if (!selectedTrackObj) return;
   selectedTrackObj.hidden = true;
   saveTracksCache();
-  // Filtrar la lista actual para quitar la oculta
   tracks = tracks.filter(t => t.url !== selectedTrackObj.url);
   renderPlaylist();
   hideSelectionMenu();
 });
 
-// E) Borrar
+// E) Borrar (Solo de la app)
 ctxDelete.addEventListener('click', () => {
   if (!selectedTrackObj) return;
-  if (confirm("¿Seguro que quieres borrar esta canción de la app? (El archivo de audio original seguirá en tu teléfono).")) {
+  if (confirm("¿Seguro que quieres quitar esta canción de la app? (El archivo original NO se borrará del teléfono).")) {
     tracks = tracks.filter(t => t.url !== selectedTrackObj.url);
     saveTracksCache();
     if (currentIndex > -1 && tracks[currentIndex] && tracks[currentIndex].url === selectedTrackObj.url) {
@@ -320,10 +335,10 @@ function renderPlaylistDetail() {
     return `<li data-index="${realIndex}" class="${realIndex === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
   }).join('');
   playlistDetailList.querySelectorAll('li').forEach(li => {
-    li.addEventListener('click', () => { const idx = parseInt(li.dataset.index); if (idx !== currentIndex) cargarCancion(idx); abrirReproductor(); });
-    // Añadir mantener presionado en playlists también
-    li.addEventListener('mousedown', () => startPress(tracks[parseInt(li.dataset.index)]));
-    li.addEventListener('touchstart', () => startPress(tracks[parseInt(li.dataset.index)]));
+    const idx = parseInt(li.dataset.index);
+    li.addEventListener('click', () => { if (idx !== currentIndex) cargarCancion(idx); abrirReproductor(); });
+    li.addEventListener('mousedown', () => startPress(tracks[idx]));
+    li.addEventListener('touchstart', () => startPress(tracks[idx]));
     li.addEventListener('mouseup', cancelPress);
     li.addEventListener('touchend', cancelPress);
     li.addEventListener('mouseleave', cancelPress);
@@ -363,7 +378,7 @@ closeAddSongsModal.addEventListener('click', () => { modalSelectSongs.style.disp
 function startPress(track) {
   pressTimer = setTimeout(() => {
     showSelectionMenu(track);
-  }, 600); // 0.6 segundos
+  }, 600); // 0.6 segundos de presión
 }
 function cancelPress() {
   clearTimeout(pressTimer);
@@ -380,7 +395,6 @@ function renderPlaylist() {
   playlistEl.querySelectorAll('li').forEach(li => {
     const idx = parseInt(li.dataset.index);
     li.addEventListener('click', () => { if (idx !== currentIndex) cargarCancion(idx); abrirReproductor(); });
-    // Eventos para mantener presionado
     li.addEventListener('mousedown', () => startPress(tracks[idx]));
     li.addEventListener('touchstart', () => startPress(tracks[idx]));
     li.addEventListener('mouseup', cancelPress);
@@ -419,7 +433,6 @@ async function escanearMusicaNativa() {
       });
 
       if (newTracks.length !== tracks.length) {
-        // Mantenemos las canciones ocultas como ocultas
         const hiddenUrls = tracks.filter(t => t.hidden).map(t => t.url);
         tracks = newTracks.map(t => ({ ...t, hidden: hiddenUrls.includes(t.url) }));
         
@@ -502,8 +515,16 @@ function playAudio() {
 
 function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 
+function getActiveQueue() {
+  if (currentPlaylistId !== null) {
+    const pl = playlists.find(p => p.id === currentPlaylistId);
+    if (pl) return tracks.filter(t => pl.songs.includes(t.url));
+  }
+  return tracks.filter(t => !t.hidden);
+}
+
 function prevTrack() { 
-  const queue = tracks.filter(t => !t.hidden);
+  const queue = getActiveQueue();
   if (queue.length === 0) return;
   const currentUrl = tracks[currentIndex]?.url;
   let qIndex = queue.findIndex(t => t.url === currentUrl);
@@ -514,7 +535,7 @@ function prevTrack() {
 }
 
 function nextTrack() { 
-  const queue = tracks.filter(t => !t.hidden);
+  const queue = getActiveQueue();
   if (queue.length === 0) return;
   const currentUrl = tracks[currentIndex]?.url;
   let qIndex = queue.findIndex(t => t.url === currentUrl);
