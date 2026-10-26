@@ -7,6 +7,7 @@ let currentIndex = -1;
 let playlists = [];
 let currentPlaylistId = null;
 let currentTab = 'songs'; 
+let currentSearchQuery = ''; // Variable para guardar lo que el usuario busca
 
 let audioCtx = null;
 let sourceNode = null;
@@ -17,7 +18,7 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 let playbackMode = 'normal'; 
 
 // --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
-const CURRENT_APP_VERSION = "1.2.1"; // Actualizado por la optimización
+const CURRENT_APP_VERSION = "1.2.1"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 // --------------------------------------------
@@ -49,6 +50,10 @@ const bgInput = $('bgInput');
 const bgBlurSlider = $('bgBlurSlider');
 const uiOpacitySlider = $('uiOpacitySlider');
 const customBg = document.getElementById('custom-bg');
+
+// Elementos de la nueva barra de búsqueda
+const searchInput = $('searchInput');
+const clearSearchBtn = $('clearSearchBtn');
 
 const miniPlayer = $('mini-player');
 const miniCover = $('miniCover');
@@ -109,6 +114,40 @@ let pressTimer;
 let wakeLock = null;
 
 // ============================================================
+// LÓGICA DE LA BARRA DE BÚSQUEDA
+// ============================================================
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        currentSearchQuery = e.target.value.toLowerCase().trim();
+        
+        if (clearSearchBtn) {
+            clearSearchBtn.style.display = currentSearchQuery.length > 0 ? 'block' : 'none';
+        }
+
+        // Actualizar la vista actual
+        if (currentTab === 'playlist-detail') {
+            renderPlaylistDetail();
+        } else {
+            renderPlaylist();
+        }
+    });
+}
+
+if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        currentSearchQuery = '';
+        clearSearchBtn.style.display = 'none';
+        
+        if (currentTab === 'playlist-detail') {
+            renderPlaylistDetail();
+        } else {
+            renderPlaylist();
+        }
+    });
+}
+
+// ============================================================
 // FUNCIONES PARA EL SERVICIO EN PRIMER PLANO (Optimización 2GB RAM)
 // ============================================================
 async function iniciarServicioSegundoPlano() {
@@ -118,9 +157,7 @@ async function iniciarServicioSegundoPlano() {
             await ForegroundService.startForegroundService({
                 id: 1,
                 title: "ymPlay",
-                body: "Reproduciendo música en segundo plano...",
-                // Si tienes un icono en la carpeta drawable de android, puedes ponerlo aquí
-                // smallIcon: "ic_stat_icon_config_sample" 
+                body: "Reproduciendo música en segundo plano..."
             });
         } catch (e) { console.warn("Error al iniciar servicio", e); }
     }
@@ -177,7 +214,6 @@ function extraerColorDominante(imageSrc) {
         const colorHex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         
         aplicarColorTema(colorHex, r, g, b);
-        document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
     };
 }
@@ -283,7 +319,7 @@ async function requestWakeLock() {
   try { 
       if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); 
   } catch (err) {}
-  iniciarServicioSegundoPlano(); // Iniciar servicio en primer plano
+  iniciarServicioSegundoPlano(); 
 }
 
 function releaseWakeLock() { 
@@ -291,7 +327,7 @@ function releaseWakeLock() {
         wakeLock.release(); 
         wakeLock = null; 
     } 
-    detenerServicioSegundoPlano(); // Detener servicio en primer plano
+    detenerServicioSegundoPlano(); 
 }
 
 // ============================================================
@@ -369,22 +405,31 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
 });
 
 // ============================================================
-// 7. RENDERIZAR LISTA
+// 7. RENDERIZAR LISTA (CON FILTRO DE BÚSQUEDA)
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   
   let displayTracks = tracks.filter(t => !t.hidden);
   
+  // Filtro por pestaña (Favoritos)
   if (currentTab === 'favorites') {
       displayTracks = displayTracks.filter(t => t.isFavorite);
+  }
+
+  // Filtro por búsqueda (Nombre o Artista)
+  if (currentSearchQuery) {
+      displayTracks = displayTracks.filter(t => 
+          t.name.toLowerCase().includes(currentSearchQuery) || 
+          (t.artist && t.artist.toLowerCase().includes(currentSearchQuery))
+      );
   }
 
   const tc = $('trackCount');
   if (tc) tc.textContent = `${displayTracks.length} pistas`;
   
   if (displayTracks.length === 0) { 
-      playlistEl.innerHTML = `<li style="justify-content:center;color:var(--text-secondary);">No hay música ${currentTab === 'favorites' ? 'en favoritos' : ''}.</li>`; 
+      playlistEl.innerHTML = `<li style="justify-content:center;color:var(--text-secondary);">No hay música ${currentSearchQuery ? 'que coincida con la búsqueda' : (currentTab === 'favorites' ? 'en favoritos' : '')}.</li>`; 
       return; 
   }
 
@@ -502,7 +547,6 @@ function nextTrack() {
   if (realIndex !== -1) cargarCancion(realIndex);
 }
 
-// --- FUNCIÓN MEJORADA PARA AURICULARES ---
 function setupMediaSession(track, coverUrl) {
   if ('mediaSession' in navigator) {
     try {
@@ -515,7 +559,6 @@ function setupMediaSession(track, coverUrl) {
 
       navigator.mediaSession.setActionHandler('play', () => playAudio());
       navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-      
       navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
       
@@ -551,7 +594,7 @@ audio.addEventListener('timeupdate', () => {
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
-  requestWakeLock(); // Inicia el servicio en primer plano
+  requestWakeLock(); 
   if (isEqActive) setupAudioContext(); 
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
@@ -559,7 +602,7 @@ audio.addEventListener('pause', () => {
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-  releaseWakeLock(); // Detiene el servicio en primer plano
+  releaseWakeLock(); 
 });
 audio.addEventListener('ended', () => {
     if (playbackMode === 'repeat') { audio.currentTime = 0; playAudio(); } 
@@ -644,13 +687,25 @@ function renderPlaylistsList() {
 function renderPlaylistDetail() {
   const pl = playlists.find(p => p.id === currentPlaylistId);
   if (!pl) return;
-  const songsInPlaylist = tracks.filter(t => pl.songs.includes(t.url) && !t.hidden);
-  if (songsInPlaylist.length === 0) { playlistDetailList.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Playlist vacía u oculta.</li>'; return; }
+  
+  let songsInPlaylist = tracks.filter(t => pl.songs.includes(t.url) && !t.hidden);
+  
+  // Filtro de búsqueda aplicado también a la playlist
+  if (currentSearchQuery) {
+      songsInPlaylist = songsInPlaylist.filter(t => 
+          t.name.toLowerCase().includes(currentSearchQuery) || 
+          (t.artist && t.artist.toLowerCase().includes(currentSearchQuery))
+      );
+  }
+
+  if (songsInPlaylist.length === 0) { playlistDetailList.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Playlist vacía o sin coincidencias.</li>'; return; }
+  
   playlistDetailList.innerHTML = songsInPlaylist.map((t) => {
     let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
     const realIndex = tracks.findIndex(x => x.url === t.url);
     return `<li data-index="${realIndex}" class="${realIndex === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
   }).join('');
+  
   playlistDetailList.querySelectorAll('li').forEach(li => {
     const idx = parseInt(li.dataset.index);
     li.addEventListener('click', () => { if (idx !== currentIndex) cargarCancion(idx); abrirReproductor(); });
@@ -713,7 +768,6 @@ document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn
         const b = parseInt(colorHex.slice(5,7), 16);
 
         aplicarColorTema(colorHex, r, g, b);
-        document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
     });
 });
 
@@ -729,7 +783,6 @@ if($('customColorPicker')) {
         const b = parseInt(colorHex.slice(5,7), 16);
 
         aplicarColorTema(colorHex, r, g, b);
-        document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
     });
 }
 
@@ -744,7 +797,6 @@ if($('btnAutoColor')) {
             extraerColorDominante(savedBg);
         } else {
             aplicarColorTema("#00d2ff", 0, 210, 255);
-            document.querySelector('.palette-dot[data-color="ocean"]').classList.add('active');
             localStorage.removeItem('ymPlay_manualTheme');
         }
     });
@@ -948,7 +1000,6 @@ function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOv
 
 const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
-document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); localStorage.removeItem('ymPlay_manualTheme'); document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active')); }); });
 
 function setupBackButton() {
   const App = window.Capacitor?.Plugins?.App;
@@ -970,7 +1021,8 @@ function setupBackButton() {
 
 async function checkForUpdates() {
   try {
-    const response = await fetch(UPDATE_JSON_URL);
+    // Anti-caché añadido al final
+    const response = await fetch(UPDATE_JSON_URL + '?t=' + new Date().getTime());
     const data = await response.json();
     
     if (data.version !== CURRENT_APP_VERSION) {
@@ -1016,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.documentElement.style.setProperty('--accent', savedThemeColor);
       document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
       document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${savedThemeColor} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
-      document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
+      
       const matchBtn = document.querySelector(`.color-option[data-color="${savedThemeColor}"]`);
       if (matchBtn) matchBtn.classList.add('active');
       else {
