@@ -1,74 +1,42 @@
-name: Compilar APK Firmado
-on: [push]
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '21'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-      - name: Generar Íconos y Splash
-        run: npx @capacitor/assets generate --android
+      - name: Capacitor Sync
+        run: npx cap sync android
 
-      - name: Sync Capacitor
-        run: npx cap sync
-
-      - name: Add all required permissions to Manifest
-        run: |
-          # Permisos para Android nuevo (13+) y Android viejo (12-)
-          sed -i 's/<\/manifest>/<uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/><uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"\/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"\/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/><uses-permission android:name="android.permission.WAKE_LOCK"\/><\/manifest>/' android/app/src/main/AndroidManifest.xml
-
-      - name: Configure FileProvider for Sharing
-        run: |
-          mkdir -p android/app/src/main/res/xml
-          echo '<?xml version="1.0" encoding="utf-8"?>
-          <paths xmlns:android="http://schemas.android.com/apk/res/android">
-              <cache-path name="cache" path="." />
-              <external-path name="external" path="." />
-              <external-files-path name="external_files" path="." />
-              <files-path name="files" path="." />
-          </paths>' > android/app/src/main/res/xml/file_paths.xml
-
-      - name: Build debug APK
+      - name: Build APK
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Extract signing key
-        run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.p12
-
-      - name: Sign APK with apksigner
-        run: |
-          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
-          $BUILD_TOOLS_DIR/zipalign -v -p 4 android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/app-debug-aligned.apk
-          $BUILD_TOOLS_DIR/apksigner sign --ks android/release.p12 \
-            --ks-type PKCS12 \
-            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
-            --ks-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --key-pass pass:"${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --out android/app/build/outputs/apk/debug/app-debug-signed.apk \
-            android/app/build/outputs/apk/debug/app-debug-aligned.apk
-
-      - name: Upload signed APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ymPlay-APK
-          path: android/app/build/outputs/apk/debug/app-debug-signed.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
