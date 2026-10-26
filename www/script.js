@@ -478,18 +478,11 @@ async function escanearMusicaNativa() {
         hidden: false, 
         isFavorite: false
       })).filter(t => {
-        // 1. Verificar que el archivo tenga una URL válida
         if (!t.url) return false;
 
-        // 2. FILTRO DE DURACIÓN: Ignorar audios menores a 1 minuto (60 segundos)
-        // Comprobamos si viene en milisegundos o segundos para hacerlo a prueba de fallos
         const duracionSegundos = t.duration > 1000 ? t.duration / 1000 : t.duration;
-        
-        // CORRECCIÓN: Si la duración es mayor a 0, aplicamos el filtro. 
-        // Si es 0 (error común en celulares viejos donde no lee los metadatos), lo dejamos pasar.
         if (duracionSegundos > 0 && duracionSegundos < 60) return false; 
 
-        // 3. FILTRO DE RUTAS: Excluir carpetas de mensajería y sistema
         const urlMinuscula = t.url.toLowerCase();
         const carpetasBasura = [
             '/whatsapp/', 
@@ -499,15 +492,13 @@ async function escanearMusicaNativa() {
             '/notifications/', 
             '/ringtones/', 
             '/alarms/',
-            '/ui/' // Sonidos de la interfaz de Android
+            '/ui/' 
         ];
         if (carpetasBasura.some(carpeta => urlMinuscula.includes(carpeta))) return false;
 
-        // 4. FILTRO DE NOMBRES: Excluir notas de voz de WhatsApp (suelen empezar con "PTT-")
         const nombreMinuscula = t.name.toLowerCase();
         if (nombreMinuscula.startsWith('ptt-') || nombreMinuscula.includes('whatsapp audio') || nombreMinuscula.includes('audio de whatsapp')) return false;
 
-        // Si el archivo pasó todos los filtros, se considera música válida
         return true;
       });
 
@@ -515,7 +506,6 @@ async function escanearMusicaNativa() {
         const hiddenUrls = tracks.filter(t => t.hidden).map(t => t.url);
         const favUrls = tracks.filter(t => t.isFavorite).map(t => t.url);
         
-        // Mezclamos los nuevos tracks con los estados previos (ocultos y favoritos)
         tracks = newTracks.map(t => ({ 
             ...t, 
             hidden: hiddenUrls.includes(t.url), 
@@ -588,6 +578,7 @@ if(saveNewPlaylist) saveNewPlaylist.addEventListener('click', () => {
   if (name) { playlists.push({ id: Date.now().toString(), name: name, songs: [] }); savePlaylists(); modalNewPlaylist.style.display = 'none'; renderPlaylistsList(); }
 });
 
+// AQUI ESTA EL CAMBIO: Se agregó la imagen a la lista de agregar canciones
 if(btnAddSongsToPlaylist) btnAddSongsToPlaylist.addEventListener('click', () => {
   const pl = playlists.find(p => p.id === currentPlaylistId);
   if (!pl) return;
@@ -596,7 +587,20 @@ if(btnAddSongsToPlaylist) btnAddSongsToPlaylist.addEventListener('click', () => 
     const isAdded = pl.songs.includes(t.url);
     const li = document.createElement('li');
     li.style.display = 'flex'; li.style.justifyContent = 'space-between'; li.style.alignItems = 'center';
-    li.innerHTML = `<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 80%;">${t.name}</span><span style="font-size:18px; color:${isAdded ? 'var(--accent)' : 'var(--text-secondary)'}">${isAdded ? '✓' : '+'}</span>`;
+    
+    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
+    const imgHtml = displayCover 
+        ? `<img src="${displayCover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">` 
+        : `<div style="width:40px;height:40px;background:var(--bg-card-solid);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;">🎵</div>`;
+
+    li.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; flex:1; overflow:hidden;">
+            ${imgHtml}
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:500;">${t.name}</span>
+        </div>
+        <span style="font-size:20px; padding-left: 10px; color:${isAdded ? 'var(--accent)' : 'var(--text-secondary)'}">${isAdded ? '✓' : '+'}</span>
+    `;
+    
     li.addEventListener('click', () => {
       const index = pl.songs.indexOf(t.url);
       const iconSpan = li.querySelector('span:last-child');
@@ -767,19 +771,41 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); }); });
 
+// AQUI ESTA EL CAMBIO: Lógica del botón "Atrás" del celular mejorada
 function setupBackButton() {
   const AppPlugin = window.Capacitor?.Plugins?.App;
   if (AppPlugin) {
     AppPlugin.addListener('backButton', () => {
-      if (sideMenu && sideMenu.classList.contains('open')) closeMenu();
-      else if (selectionMenu.classList.contains('show')) hideSelectionMenu();
+      // 1. Cerrar menús laterales o modales si están abiertos
+      if (sideMenu && sideMenu.classList.contains('open')) {
+          closeMenu();
+      } 
+      else if (selectionMenu.classList.contains('show')) {
+          hideSelectionMenu();
+      }
       else if (modalSelectSongs.style.display === 'flex' || modalNewPlaylist.style.display === 'flex' || modalCtxPlaylists.style.display === 'flex') { 
         modalSelectSongs.style.display = 'none'; modalNewPlaylist.style.display = 'none'; modalCtxPlaylists.style.display = 'none'; 
       }
-      else if (screenPlayer && screenPlayer.style.display === 'flex') volverALista();
-      else if (viewPlaylistDetail && viewPlaylistDetail.style.display === 'flex') { showView('playlists'); renderPlaylistsList(); }
-      else if (viewPlaylists && viewPlaylists.style.display === 'flex') { showView('songs'); renderPlaylist(); }
-      else AppPlugin.exitApp();
+      // 2. Si estamos en la pantalla del reproductor, volver a la lista
+      else if (screenPlayer && screenPlayer.style.display === 'flex') {
+          volverALista();
+      }
+      // 3. Si estamos viendo el detalle de una playlist, volver a la lista de playlists
+      else if (viewPlaylistDetail && viewPlaylistDetail.style.display === 'flex') { 
+          showView('playlists'); renderPlaylistsList(); 
+      }
+      // 4. Si estamos en la pestaña de Favoritos, volver a Canciones
+      else if (currentTab === 'favorites') {
+          showView('songs');
+      }
+      // 5. Si estamos en la pestaña de Playlists, volver a Canciones
+      else if (currentTab === 'playlists') {
+          showView('songs');
+      }
+      // 6. Si ya estamos en la pantalla principal (Canciones), salir de la app
+      else { 
+          AppPlugin.exitApp(); 
+      }
     });
   }
 }
