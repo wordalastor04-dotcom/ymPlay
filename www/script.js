@@ -7,7 +7,7 @@ let currentIndex = -1;
 let playlists = [];
 let currentPlaylistId = null;
 let currentTab = 'songs'; 
-let currentSearchQuery = ''; // Variable para guardar lo que el usuario busca
+let currentSearchQuery = ''; 
 
 let audioCtx = null;
 let sourceNode = null;
@@ -18,7 +18,7 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 let playbackMode = 'normal'; 
 
 // --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
-const CURRENT_APP_VERSION = "1.2.3"; 
+const CURRENT_APP_VERSION = "1.2.1"; // Asegúrate de que esta sea la versión que estás compilando
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 // --------------------------------------------
@@ -51,7 +51,6 @@ const bgBlurSlider = $('bgBlurSlider');
 const uiOpacitySlider = $('uiOpacitySlider');
 const customBg = document.getElementById('custom-bg');
 
-// Elementos de la nueva barra de búsqueda
 const searchInput = $('searchInput');
 const clearSearchBtn = $('clearSearchBtn');
 
@@ -124,7 +123,6 @@ if (searchInput) {
             clearSearchBtn.style.display = currentSearchQuery.length > 0 ? 'block' : 'none';
         }
 
-        // Actualizar la vista actual
         if (currentTab === 'playlist-detail') {
             renderPlaylistDetail();
         } else {
@@ -148,7 +146,7 @@ if (clearSearchBtn) {
 }
 
 // ============================================================
-// FUNCIONES PARA EL SERVICIO EN PRIMER PLANO (Optimización 2GB RAM)
+// FUNCIONES PARA EL SERVICIO EN PRIMER PLANO
 // ============================================================
 async function iniciarServicioSegundoPlano() {
     const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
@@ -405,19 +403,17 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
 });
 
 // ============================================================
-// 7. RENDERIZAR LISTA (CON FILTRO DE BÚSQUEDA)
+// 7. RENDERIZAR LISTA
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   
   let displayTracks = tracks.filter(t => !t.hidden);
   
-  // Filtro por pestaña (Favoritos)
   if (currentTab === 'favorites') {
       displayTracks = displayTracks.filter(t => t.isFavorite);
   }
 
-  // Filtro por búsqueda (Nombre o Artista)
   if (currentSearchQuery) {
       displayTracks = displayTracks.filter(t => 
           t.name.toLowerCase().includes(currentSearchQuery) || 
@@ -690,7 +686,6 @@ function renderPlaylistDetail() {
   
   let songsInPlaylist = tracks.filter(t => pl.songs.includes(t.url) && !t.hidden);
   
-  // Filtro de búsqueda aplicado también a la playlist
   if (currentSearchQuery) {
       songsInPlaylist = songsInPlaylist.filter(t => 
           t.name.toLowerCase().includes(currentSearchQuery) || 
@@ -1019,13 +1014,27 @@ function setupBackButton() {
   }
 }
 
+// --- NUEVA LÓGICA DE COMPARACIÓN DE VERSIONES ---
+function isNewerVersion(serverVersion, currentVersion) {
+    const serverParts = serverVersion.split('.').map(Number);
+    const currentParts = currentVersion.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(serverParts.length, currentParts.length); i++) {
+        const s = serverParts[i] || 0;
+        const c = currentParts[i] || 0;
+        if (s > c) return true;  // Servidor más nuevo -> Actualizar
+        if (s < c) return false; // App más nueva -> No actualizar
+    }
+    return false; // Son iguales -> No actualizar
+}
+
 async function checkForUpdates() {
   try {
-    // Anti-caché añadido al final
     const response = await fetch(UPDATE_JSON_URL + '?t=' + new Date().getTime());
     const data = await response.json();
     
-    if (data.version !== CURRENT_APP_VERSION) {
+    // Solo mostramos el aviso si la versión del SERVIDOR es MAYOR a la de la APP
+    if (isNewerVersion(data.version, CURRENT_APP_VERSION)) {
       const banner = $('update-banner');
       if (banner) {
         banner.classList.add('show');
