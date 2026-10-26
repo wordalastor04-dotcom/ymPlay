@@ -16,14 +16,8 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 let playbackMode = 'normal'; 
 
-// Variables de Estadísticas
 let totalListeningSeconds = parseInt(localStorage.getItem('ymPlay_totalListenTime') || '0');
 let playCounts = JSON.parse(localStorage.getItem('ymPlay_playCounts') || '{}');
-let lastTickTime = 0;
-
-const CURRENT_APP_VERSION = "1.1.6"; 
-const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
-const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
 const $ = id => document.getElementById(id);
 const screenMain = $('screen-main');
@@ -127,6 +121,7 @@ function applyBackground(imageSrc, blurAmount) {
 }
 
 function extraerColorDominante(imageSrc) {
+    if (!imageSrc) return;
     const img = new Image();
     img.src = imageSrc;
     img.onload = () => {
@@ -148,12 +143,17 @@ function extraerColorDominante(imageSrc) {
         r = Math.floor(r / count); g = Math.floor(g / count); b = Math.floor(b / count);
         const colorHex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         
-        document.documentElement.style.setProperty('--accent', colorHex);
-        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+        aplicarColorTema(colorHex, r, g, b);
         document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
     };
+}
+
+function aplicarColorTema(hex, r, g, b) {
+    document.documentElement.style.setProperty('--accent', hex);
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+    document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${hex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+    localStorage.setItem('ymPlay_manualTheme', hex);
 }
 
 if (bgInput) { 
@@ -206,7 +206,6 @@ function updateStatsUI() {
     }
 }
 
-// Guardar tiempo cada 5 segundos para no saturar el disco
 setInterval(() => {
     if (!audio.paused && currentIndex !== -1) {
         totalListeningSeconds++;
@@ -259,7 +258,6 @@ function loadCachedTracks() {
   const cached = localStorage.getItem('ymPlay_tracks_cache');
   if (cached) {
     tracks = JSON.parse(cached);
-    // OJO: Ya no filtramos los ocultos aquí, los cargamos todos y luego filtramos en render
     if (tracks.length > 0) renderPlaylist();
   }
 }
@@ -328,12 +326,11 @@ document.querySelectorAll('.tab-btn-main').forEach(btn => {
 });
 
 // ============================================================
-// 7. RENDERIZAR LISTA (AHORA FILTRA OCULTOS)
+// 7. RENDERIZAR LISTA
 // ============================================================
 function renderPlaylist() {
   if (!playlistEl) return;
   
-  // Filtramos canciones ocultas aquí
   let displayTracks = tracks.filter(t => !t.hidden);
   
   if (currentTab === 'favorites') {
@@ -350,7 +347,7 @@ function renderPlaylist() {
 
   playlistEl.innerHTML = displayTracks.map((t) => {
     let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
-    const realIndex = tracks.findIndex(x => x.url === t.url); // El index real en el array global
+    const realIndex = tracks.findIndex(x => x.url === t.url);
     return `<li data-index="${realIndex}" class="${realIndex === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name} ${t.isFavorite ? '❤️' : ''}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
   }).join('');
   
@@ -374,7 +371,6 @@ function cargarCancion(index, startTime = 0) {
   
   audio.src = playableUrl;
   
-  // ESTADÍSTICAS: Aumentar contador de reproducciones
   playCounts[track.url] = (playCounts[track.url] || 0) + 1;
   localStorage.setItem('ymPlay_playCounts', JSON.stringify(playCounts));
   updateStatsUI();
@@ -561,7 +557,7 @@ function sortTracks(criteria) {
 }
 
 // ============================================================
-// 10. PLAYLISTS Y AJUSTES (NUEVO)
+// 10. PLAYLISTS Y AJUSTES
 // ============================================================
 function loadPlaylists() { const saved = localStorage.getItem('ymPlay_playlists'); if (saved) playlists = JSON.parse(saved); }
 function savePlaylists() { localStorage.setItem('ymPlay_playlists', JSON.stringify(playlists)); }
@@ -633,7 +629,6 @@ if($('closeSettingsBtn')) $('closeSettingsBtn').addEventListener('click', () => 
     screenMain.style.display = 'flex';
 });
 
-// Toggle de Audio Focus
 if($('toggleAudioFocus')) {
     $('toggleAudioFocus').checked = localStorage.getItem('ymPlay_audioFocus') === 'true';
     $('toggleAudioFocus').addEventListener('change', (e) => {
@@ -641,38 +636,57 @@ if($('toggleAudioFocus')) {
     });
 }
 
-// Toggle de Calidad de Audio
-if($('toggleHiResAudio')) {
-    $('toggleHiResAudio').checked = localStorage.getItem('ymPlay_hiRes') === 'true';
-    $('toggleHiResAudio').addEventListener('change', (e) => {
-        localStorage.setItem('ymPlay_hiRes', e.target.checked);
-        if (e.target.checked && !audioCtx) setupAudioContext();
-    });
-}
-
-// Cambio de color manual
-document.querySelectorAll('.color-option').forEach(btn => {
+// Lógica de colores manuales
+document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn => {
     btn.addEventListener('click', () => {
         const colorHex = btn.dataset.color;
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
         btn.classList.add('active');
         
-        // Convertir hex a rgb para el glow
         const r = parseInt(colorHex.slice(1,3), 16);
         const g = parseInt(colorHex.slice(3,5), 16);
         const b = parseInt(colorHex.slice(5,7), 16);
 
-        document.documentElement.style.setProperty('--accent', colorHex);
-        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
-        
-        // Quitar paletas activas
+        aplicarColorTema(colorHex, r, g, b);
         document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
-        
-        // Guardar elección
-        localStorage.setItem('ymPlay_manualTheme', colorHex);
     });
 });
+
+// Lógica del selector de color personalizado
+if($('customColorPicker')) {
+    $('customColorPicker').addEventListener('input', (e) => {
+        const colorHex = e.target.value;
+        document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
+        document.querySelector('.custom-color-picker').style.background = colorHex;
+        document.querySelector('.custom-color-picker').classList.add('active');
+        
+        const r = parseInt(colorHex.slice(1,3), 16);
+        const g = parseInt(colorHex.slice(3,5), 16);
+        const b = parseInt(colorHex.slice(5,7), 16);
+
+        aplicarColorTema(colorHex, r, g, b);
+        document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
+    });
+}
+
+// Lógica del botón de Color Automático
+if($('btnAutoColor')) {
+    $('btnAutoColor').addEventListener('click', () => {
+        localStorage.removeItem('ymPlay_manualTheme');
+        document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
+        document.querySelector('.custom-color-picker').style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
+        
+        const savedBg = localStorage.getItem('ymPlay_customBg');
+        if (savedBg) {
+            extraerColorDominante(savedBg);
+        } else {
+            // Si no hay foto, volvemos al azul por defecto
+            aplicarColorTema("#00d2ff", 0, 210, 255);
+            document.querySelector('.palette-dot[data-color="ocean"]').classList.add('active');
+            localStorage.removeItem('ymPlay_manualTheme');
+        }
+    });
+}
 
 // Lógica de botones base
 if(backToPlaylistsBtn) backToPlaylistsBtn.addEventListener('click', () => { showView('playlists'); renderPlaylistsList(); });
@@ -769,7 +783,6 @@ if(ctxShare) ctxShare.addEventListener('click', async () => {
 
 if(ctxHide) ctxHide.addEventListener('click', () => {
   if (!selectedTrackObj) return;
-  // Ahora solo marcamos como oculto en vez de borrarlo del array
   const track = tracks.find(t => t.url === selectedTrackObj.url);
   if (track) track.hidden = true;
   saveTracksCache();
@@ -787,16 +800,12 @@ if(ctxDelete) ctxDelete.addEventListener('click', () => {
 });
 
 // ============================================================
-// 12. ECUALIZADOR Y AUDIO DE ALTA CALIDAD
+// 12. ECUALIZADOR (SIN HI-RES PARA EVITAR TIRONES)
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
-    const isHiRes = localStorage.getItem('ymPlay_hiRes') === 'true';
-    // Si el usuario eligió Alta Calidad, forzamos 48000Hz
-    const sampleRate = isHiRes ? 48000 : undefined; 
-    
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     sourceNode = audioCtx.createMediaElementSource(audio);
     eqFilters = EQ_FREQS.map(freq => { const filter = audioCtx.createBiquadFilter(); filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0; return filter; });
     let prev = sourceNode; eqFilters.forEach(f => { prev.connect(f); prev = f; }); prev.connect(audioCtx.destination);
@@ -878,9 +887,9 @@ function closeMenu() { if(sideMenu) sideMenu.classList.remove('open'); if(menuOv
 
 const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
-document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); localStorage.removeItem('ymPlay_manualTheme'); }); });
+document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); localStorage.removeItem('ymPlay_manualTheme'); document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active')); }); });
 
-// Lógica del botón Atrás mejorada
+// Lógica del botón Atrás
 function setupBackButton() {
   const App = window.Capacitor?.Plugins?.App;
   if (App) {
@@ -909,18 +918,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedOpacity = localStorage.getItem('ymPlay_uiOpacity');
   if (savedOpacity) { uiOpacitySlider.value = savedOpacity; document.documentElement.style.setProperty('--ui-transparency', savedOpacity); }
 
-  // Cargar Tema Manual si existe
   const savedThemeColor = localStorage.getItem('ymPlay_manualTheme');
   if (savedThemeColor) {
-      document.documentElement.style.setProperty('--accent', savedThemeColor);
       const r = parseInt(savedThemeColor.slice(1,3), 16);
       const g = parseInt(savedThemeColor.slice(3,5), 16);
       const b = parseInt(savedThemeColor.slice(5,7), 16);
+      document.documentElement.style.setProperty('--accent', savedThemeColor);
       document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
       document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${savedThemeColor} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
       document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
       const matchBtn = document.querySelector(`.color-option[data-color="${savedThemeColor}"]`);
       if (matchBtn) matchBtn.classList.add('active');
+      else {
+          const customBtn = document.querySelector('.custom-color-picker');
+          if(customBtn) { customBtn.style.background = savedThemeColor; customBtn.classList.add('active'); }
+      }
   }
 
   const savedBg = localStorage.getItem('ymPlay_customBg'); 
@@ -928,7 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (savedBg) { 
       if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
       applyBackground(savedBg, savedBlur); 
-      if (!savedThemeColor) extraerColorDominante(savedBg); // Solo si no hay tema manual
+      if (!savedThemeColor) extraerColorDominante(savedBg);
   }
   
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
