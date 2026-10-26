@@ -26,26 +26,33 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # 1. Crea la carpeta nativa de Android desde cero
       - name: Add Android Platform
         run: npx cap add android
 
-      # 2. Convierte tu icon.png en todos los tamaños que Android necesita
       - name: Generate App Icons
         run: npx @capacitor/assets generate --android
 
-      # 3. Sincroniza tus archivos web y plugins a la carpeta Android
       - name: Capacitor Sync
         run: npx cap sync android
 
-      # 4. Compila el APK
+      # --- AQUÍ INYECTAMOS TU FIRMA DIGITAL EXISTENTE ---
+      - name: Decode Keystore
+        run: |
+          # Decodifica el archivo base64 de GitHub y lo guarda en la carpeta de Android
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+
       - name: Build APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          
+          # Compila usando tu firma y tus contraseñas exactas desde GitHub Secrets
+          ./gradlew assembleDebug \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
-      # 5. Sube el APK para que lo descargues
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
