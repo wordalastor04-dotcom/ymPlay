@@ -17,7 +17,7 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 let playbackMode = 'normal'; 
 
 // --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
-const CURRENT_APP_VERSION = "1.1.9"; 
+const CURRENT_APP_VERSION = "1.1.7"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 // --------------------------------------------
@@ -805,7 +805,7 @@ if(ctxDelete) ctxDelete.addEventListener('click', () => {
 });
 
 // ============================================================
-// 12. ECUALIZADOR (SIN HI-RES PARA EVITAR TIRONES)
+// 12. ECUALIZADOR
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
@@ -945,13 +945,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   loadCachedTracks();
   
-  // --- AQUI ESTA EL CAMBIO DE LOS VALORES POR DEFECTO ---
   const savedOpacity = localStorage.getItem('ymPlay_uiOpacity');
   if (savedOpacity) { 
       uiOpacitySlider.value = savedOpacity; 
       document.documentElement.style.setProperty('--ui-transparency', savedOpacity); 
   } else {
-      // Si es la primera vez que abre, ponemos 0.2 (máxima transparencia)
       uiOpacitySlider.value = 0.2;
       document.documentElement.style.setProperty('--ui-transparency', 0.2);
   }
@@ -974,11 +972,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const savedBg = localStorage.getItem('ymPlay_customBg'); 
-  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0; // Por defecto 0 si no hay nada guardado
+  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0; 
+  
   if (savedBg) { 
       if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
       applyBackground(savedBg, savedBlur); 
       if (!savedThemeColor) extraerColorDominante(savedBg);
+  } else {
+      // AQUÍ APLICAMOS LA FOTO POR DEFECTO
+      const defaultImage = 'default-bg.jpg'; 
+      applyBackground(defaultImage, 0);
   }
   
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
