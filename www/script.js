@@ -241,6 +241,7 @@ function showView(viewName) {
   
   if (viewName === 'songs') { 
       currentTab = 'songs';
+      currentPlaylistId = null; // Limpiamos la playlist activa
       viewSongs.style.display = 'flex'; 
       document.querySelectorAll('.tab-btn-main').forEach(b => b.classList.remove('active')); 
       document.querySelector('.tab-btn-main[data-view="songs"]').classList.add('active'); 
@@ -249,6 +250,7 @@ function showView(viewName) {
   } 
   else if (viewName === 'favorites') { 
       currentTab = 'favorites';
+      currentPlaylistId = null; // Limpiamos la playlist activa
       viewSongs.style.display = 'flex'; 
       document.querySelectorAll('.tab-btn-main').forEach(b => b.classList.remove('active')); 
       document.querySelector('.tab-btn-main[data-view="favorites"]').classList.add('active'); 
@@ -257,6 +259,7 @@ function showView(viewName) {
   }
   else if (viewName === 'playlists') { 
       currentTab = 'playlists';
+      currentPlaylistId = null; // Limpiamos la playlist activa
       viewPlaylists.style.display = 'flex'; 
       document.querySelectorAll('.tab-btn-main').forEach(b => b.classList.remove('active')); 
       document.querySelector('.tab-btn-main[data-view="playlists"]').classList.add('active'); 
@@ -578,7 +581,6 @@ if(saveNewPlaylist) saveNewPlaylist.addEventListener('click', () => {
   if (name) { playlists.push({ id: Date.now().toString(), name: name, songs: [] }); savePlaylists(); modalNewPlaylist.style.display = 'none'; renderPlaylistsList(); }
 });
 
-// AQUI ESTA EL CAMBIO: Se agregó la imagen a la lista de agregar canciones
 if(btnAddSongsToPlaylist) btnAddSongsToPlaylist.addEventListener('click', () => {
   const pl = playlists.find(p => p.id === currentPlaylistId);
   if (!pl) return;
@@ -735,8 +737,18 @@ function abrirReproductor() { if(screenMain) screenMain.style.display = 'none'; 
 function volverALista() { 
   if(screenPlayer) screenPlayer.style.display = 'none'; 
   if(screenMain) screenMain.style.display = 'flex'; 
-  if (currentPlaylistId !== null) renderPlaylistDetail();
-  else renderPlaylist();
+  
+  if (currentPlaylistId !== null) {
+      // Si venimos de una playlist, restauramos la vista de la playlist
+      viewSongs.style.display = 'none'; 
+      viewPlaylists.style.display = 'none'; 
+      viewPlaylistDetail.style.display = 'flex'; 
+      mainTabs.style.display = 'none';
+      renderPlaylistDetail();
+  } else {
+      // Si venimos de la lista general o favoritos, restauramos esa pestaña
+      showView(currentTab || 'songs');
+  }
 }
 
 function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; }
@@ -771,42 +783,52 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); }); });
 
-// AQUI ESTA EL CAMBIO: Lógica del botón "Atrás" del celular mejorada
+// ============================================================
+// LÓGICA DEL BOTÓN ATRÁS (SÚPER MEJORADA)
+// ============================================================
 function setupBackButton() {
-  const AppPlugin = window.Capacitor?.Plugins?.App;
-  if (AppPlugin) {
-    AppPlugin.addListener('backButton', () => {
-      // 1. Cerrar menús laterales o modales si están abiertos
-      if (sideMenu && sideMenu.classList.contains('open')) {
-          closeMenu();
-      } 
-      else if (selectionMenu.classList.contains('show')) {
-          hideSelectionMenu();
+  const App = window.Capacitor?.Plugins?.App;
+  
+  if (App) {
+    App.addListener('backButton', () => {
+      // 1. Cerrar Menú Lateral
+      if (sideMenu && sideMenu.classList.contains('open')) { closeMenu(); return; }
+      
+      // 2. Cerrar Menú Contextual (Mantener presionado)
+      if (selectionMenu && selectionMenu.classList.contains('show')) { hideSelectionMenu(); return; }
+      
+      // 3. Cerrar Modales (Playlists)
+      if (modalSelectSongs.style.display === 'flex' || modalNewPlaylist.style.display === 'flex' || modalCtxPlaylists.style.display === 'flex') {
+        modalSelectSongs.style.display = 'none'; 
+        modalNewPlaylist.style.display = 'none'; 
+        modalCtxPlaylists.style.display = 'none'; 
+        return;
       }
-      else if (modalSelectSongs.style.display === 'flex' || modalNewPlaylist.style.display === 'flex' || modalCtxPlaylists.style.display === 'flex') { 
-        modalSelectSongs.style.display = 'none'; modalNewPlaylist.style.display = 'none'; modalCtxPlaylists.style.display = 'none'; 
+      
+      // 4. Si estamos en el reproductor, volver a la lista
+      if (screenPlayer && screenPlayer.style.display === 'flex') { 
+        volverALista(); 
+        return; 
       }
-      // 2. Si estamos en la pantalla del reproductor, volver a la lista
-      else if (screenPlayer && screenPlayer.style.display === 'flex') {
-          volverALista();
+      
+      // 5. Si estamos en detalle de playlist, volver a playlists
+      if (viewPlaylistDetail && viewPlaylistDetail.style.display === 'flex') { 
+        currentPlaylistId = null;
+        showView('playlists'); 
+        return; 
       }
-      // 3. Si estamos viendo el detalle de una playlist, volver a la lista de playlists
-      else if (viewPlaylistDetail && viewPlaylistDetail.style.display === 'flex') { 
-          showView('playlists'); renderPlaylistsList(); 
+      
+      // 6. Si estamos en Favoritos o Playlists, volver a Canciones
+      if (currentTab === 'favorites' || currentTab === 'playlists') { 
+        showView('songs'); 
+        return; 
       }
-      // 4. Si estamos en la pestaña de Favoritos, volver a Canciones
-      else if (currentTab === 'favorites') {
-          showView('songs');
-      }
-      // 5. Si estamos en la pestaña de Playlists, volver a Canciones
-      else if (currentTab === 'playlists') {
-          showView('songs');
-      }
-      // 6. Si ya estamos en la pantalla principal (Canciones), salir de la app
-      else { 
-          AppPlugin.exitApp(); 
-      }
+      
+      // 7. Si no hay nada más que hacer, salir de la app
+      App.exitApp();
     });
+  } else {
+    console.warn("El plugin @capacitor/app no está disponible.");
   }
 }
 
