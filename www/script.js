@@ -17,7 +17,7 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 let playbackMode = 'normal'; 
 
 // --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
-const CURRENT_APP_VERSION = "1.1.9"; 
+const CURRENT_APP_VERSION = "1.2.0"; // Actualizado por la optimización
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 // --------------------------------------------
@@ -107,6 +107,33 @@ const cancelCtxPlaylist = $('cancelCtxPlaylist');
 let selectedTrackObj = null;
 let pressTimer;
 let wakeLock = null;
+
+// ============================================================
+// FUNCIONES PARA EL SERVICIO EN PRIMER PLANO (Optimización 2GB RAM)
+// ============================================================
+async function iniciarServicioSegundoPlano() {
+    const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
+    if (ForegroundService) {
+        try {
+            await ForegroundService.startForegroundService({
+                id: 1,
+                title: "ymPlay",
+                body: "Reproduciendo música en segundo plano...",
+                // Si tienes un icono en la carpeta drawable de android, puedes ponerlo aquí
+                // smallIcon: "ic_stat_icon_config_sample" 
+            });
+        } catch (e) { console.warn("Error al iniciar servicio", e); }
+    }
+}
+
+async function detenerServicioSegundoPlano() {
+    const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
+    if (ForegroundService) {
+        try {
+            await ForegroundService.stopForegroundService();
+        } catch (e) { console.warn("Error al detener servicio", e); }
+    }
+}
 
 // ============================================================
 // 1. APARIENCIA Y AJUSTES
@@ -250,12 +277,22 @@ if(modeRepeat) modeRepeat.addEventListener('click', () => setPlaybackMode('repea
 if(modeShuffle) modeShuffle.addEventListener('click', () => setPlaybackMode('shuffle'));
 
 // ============================================================
-// 4. WAKE LOCK
+// 4. WAKE LOCK Y SERVICIO
 // ============================================================
 async function requestWakeLock() {
-  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+  try { 
+      if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); 
+  } catch (err) {}
+  iniciarServicioSegundoPlano(); // Iniciar servicio en primer plano
 }
-function releaseWakeLock() { if (wakeLock !== null) { wakeLock.release(); wakeLock = null; } }
+
+function releaseWakeLock() { 
+    if (wakeLock !== null) { 
+        wakeLock.release(); 
+        wakeLock = null; 
+    } 
+    detenerServicioSegundoPlano(); // Detener servicio en primer plano
+}
 
 // ============================================================
 // 5. MEMORIA Y CACHÉ
@@ -476,15 +513,12 @@ function setupMediaSession(track, coverUrl) {
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
 
-      // Botones principales (Play/Pausa)
       navigator.mediaSession.setActionHandler('play', () => playAudio());
       navigator.mediaSession.setActionHandler('pause', () => audio.pause());
       
-      // Botones de salto de pista
       navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
       
-      // Botones de mantener presionado (Adelantar / Atrasar)
       try {
           navigator.mediaSession.setActionHandler('seekbackward', (details) => {
               audio.currentTime = Math.max(audio.currentTime - (details.seekOffset || 10), 0);
@@ -503,11 +537,8 @@ function setupMediaSession(track, coverUrl) {
               audio.pause();
               audio.currentTime = 0;
           });
-      } catch (error) {
-          console.log("Algunos comandos de búsqueda no son soportados por este Android.");
-      }
-
-    } catch (e) { console.log("Error configurando MediaSession", e); }
+      } catch (error) {}
+    } catch (e) {}
   }
 }
 
@@ -520,7 +551,7 @@ audio.addEventListener('timeupdate', () => {
 audio.addEventListener('play', () => { 
   if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
-  requestWakeLock(); 
+  requestWakeLock(); // Inicia el servicio en primer plano
   if (isEqActive) setupAudioContext(); 
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 });
@@ -528,7 +559,7 @@ audio.addEventListener('pause', () => {
   if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
-  releaseWakeLock();
+  releaseWakeLock(); // Detiene el servicio en primer plano
 });
 audio.addEventListener('ended', () => {
     if (playbackMode === 'repeat') { audio.currentTime = 0; playAudio(); } 
@@ -626,7 +657,6 @@ function renderPlaylistDetail() {
   });
 }
 
-// Lógica para Ocultos y Ajustes
 function renderHiddenSongs() {
     const hiddenList = $('hidden-songs-list');
     if (!hiddenList) return;
@@ -653,7 +683,6 @@ window.restaurarCancion = function(url) {
     }
 };
 
-// Event Listeners para Ajustes
 if($('openSettingsBtn')) $('openSettingsBtn').addEventListener('click', () => {
     closeMenu();
     screenMain.style.display = 'none'; screenPlayer.style.display = 'none';
@@ -673,7 +702,6 @@ if($('toggleAudioFocus')) {
     });
 }
 
-// Lógica de colores manuales
 document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn => {
     btn.addEventListener('click', () => {
         const colorHex = btn.dataset.color;
@@ -689,7 +717,6 @@ document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn
     });
 });
 
-// Lógica del selector de color personalizado
 if($('customColorPicker')) {
     $('customColorPicker').addEventListener('input', (e) => {
         const colorHex = e.target.value;
@@ -706,7 +733,6 @@ if($('customColorPicker')) {
     });
 }
 
-// Lógica del botón de Color Automático
 if($('btnAutoColor')) {
     $('btnAutoColor').addEventListener('click', () => {
         localStorage.removeItem('ymPlay_manualTheme');
@@ -724,7 +750,6 @@ if($('btnAutoColor')) {
     });
 }
 
-// Lógica de botones base
 if(backToPlaylistsBtn) backToPlaylistsBtn.addEventListener('click', () => { showView('playlists'); renderPlaylistsList(); });
 if(btnNewPlaylist) btnNewPlaylist.addEventListener('click', () => { newPlaylistName.value = ''; modalNewPlaylist.style.display = 'flex'; });
 if(cancelNewPlaylist) cancelNewPlaylist.addEventListener('click', () => modalNewPlaylist.style.display = 'none');
@@ -925,7 +950,6 @@ const themeBtn = document.getElementById('themeToggle');
 if (themeBtn) { themeBtn.addEventListener('click', () => { const html = document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }); }
 document.querySelectorAll('.palette-dot').forEach(dot => { dot.addEventListener('click', () => { document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active')); dot.classList.add('active'); document.documentElement.setAttribute('data-palette', dot.dataset.color); localStorage.removeItem('ymPlay_manualTheme'); document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active')); }); });
 
-// Lógica del botón Atrás
 function setupBackButton() {
   const App = window.Capacitor?.Plugins?.App;
   if (App) {
@@ -944,7 +968,6 @@ function setupBackButton() {
   }
 }
 
-// Función para buscar actualizaciones en GitHub
 async function checkForUpdates() {
   try {
     const response = await fetch(UPDATE_JSON_URL);
