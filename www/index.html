@@ -25,6 +25,11 @@
         <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
     </div>
+    
+    <ul class="menu-list" style="margin-bottom: 20px;">
+      <li><button id="openSettingsBtn" style="color: var(--accent); font-weight: bold; border-color: var(--accent);">⚙️ Ajustes de la App</button></li>
+    </ul>
+
     <ul class="menu-list">
       <li><button id="sortNewestBtn">⬇️ Más recientes primero</button></li>
       <li><button id="sortOldestBtn">⬆️ Más antiguas primero</button></li>
@@ -74,7 +79,6 @@
         <div class="palette-dot" data-color="mono"></div>
       </div>
 
-      <!-- PESTAÑAS ACTUALIZADAS -->
       <div class="tabs-container" id="main-tabs">
         <button class="tab-btn-main active" data-view="songs">Canciones</button>
         <button class="tab-btn-main" data-view="favorites">Favoritos</button>
@@ -145,7 +149,6 @@
       <div class="song-info">
         <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
           <div class="song-title" id="songTitle">Selecciona una canción</div>
-          <!-- BOTÓN DE FAVORITO -->
           <button id="favBtn" class="fav-btn" title="Favorito">
             <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
           </button>
@@ -165,15 +168,9 @@
       </div>
 
       <div class="playback-modes">
-        <button id="modeNormal" class="mode-btn active" title="Normal">
-          <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
-        </button>
-        <button id="modeRepeat" class="mode-btn" title="Repetir 1">
-          <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-        </button>
-        <button id="modeShuffle" class="mode-btn" title="Aleatorio">
-          <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
-        </button>
+        <button id="modeNormal" class="mode-btn active" title="Normal"><svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg></button>
+        <button id="modeRepeat" class="mode-btn" title="Repetir 1"><svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+        <button id="modeShuffle" class="mode-btn" title="Aleatorio"><svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
       </div>
 
       <div class="tab-bar" style="margin-top: 15px;">
@@ -203,6 +200,88 @@
         </div>
       </div>
     </div>
+
+    <!-- PANTALLA DE AJUSTES -->
+    <div id="screen-settings" style="display: none; flex-direction: column; height: 100%; background: var(--bg-card-solid); z-index: 500;">
+      <div class="top-bar" style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="icon-btn" id="closeSettingsBtn">
+            <svg viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7z" transform="rotate(90 12 12)"/></svg>
+          </button>
+          <h1 style="font-size: 22px;">Ajustes</h1>
+        </div>
+      </div>
+
+      <div class="settings-scroll">
+        
+        <!-- SECCIÓN ESTADÍSTICAS -->
+        <div class="settings-section-title">Estadísticas</div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">⏱️</div>
+            <div class="stat-info">
+              <span class="stat-label">Tiempo total</span>
+              <span class="stat-value" id="statTotalTime">0h 0m</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔥</div>
+            <div class="stat-info">
+              <span class="stat-label">Más escuchada</span>
+              <span class="stat-value" id="statTopSong" style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ninguna</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN REPRODUCCIÓN -->
+        <div class="settings-section-title">Reproducción</div>
+        <div class="settings-group">
+          <div class="setting-item">
+            <div class="setting-text">
+              <span class="setting-title">Reproducir junto a otras apps</span>
+              <span class="setting-sub">No pausar si abres YouTube o juegos</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleAudioFocus">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <div class="setting-text">
+              <span class="setting-title">Alta Calidad de Audio</span>
+              <span class="setting-sub">Forzar motor a 48kHz (Hi-Res)</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleHiResAudio">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- SECCIÓN TEMAS -->
+        <div class="settings-section-title">Color del Tema (Manual)</div>
+        <div class="color-picker-grid" id="themeColorGrid">
+          <div class="color-option" data-color="#00d2ff" style="background: #00d2ff;"></div>
+          <div class="color-option" data-color="#ff7e5f" style="background: #ff7e5f;"></div>
+          <div class="color-option" data-color="#11998e" style="background: #11998e;"></div>
+          <div class="color-option" data-color="#8e44ad" style="background: #8e44ad;"></div>
+          <div class="color-option" data-color="#e74c3c" style="background: #e74c3c;"></div>
+          <div class="color-option" data-color="#f1c40f" style="background: #f1c40f;"></div>
+          <div class="color-option" data-color="#e84393" style="background: #e84393;"></div>
+          <div class="color-option" data-color="#95a5a6" style="background: #95a5a6;"></div>
+        </div>
+
+        <!-- SECCIÓN OCULTOS -->
+        <div class="settings-section-title">Canciones Ocultas</div>
+        <div class="settings-group">
+          <ul class="playlist" id="hidden-songs-list">
+            <!-- Se llena con JS -->
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <!-- MENÚ DE SELECCIÓN (MANTENER PRESIONADO) -->
@@ -214,26 +293,11 @@
       </button>
     </div>
     <div class="sheet-actions">
-      <button class="sheet-btn" id="ctxAddTo">
-        <svg viewBox="0 0 24 24"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
-        <span>Agregar a</span>
-      </button>
-      <button class="sheet-btn" id="ctxPlayNext">
-        <svg viewBox="0 0 24 24"><path d="M3 18h12v-2H3v2zm0-4h12v-2H3v2zm0-4h12V8H3v2zm14-6v12l5-6-5-6z"/></svg>
-        <span>Reproducir a continuación</span>
-      </button>
-      <button class="sheet-btn" id="ctxShare">
-        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-        <span>Compartir</span>
-      </button>
-      <button class="sheet-btn" id="ctxHide">
-        <svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>
-        <span>Ocultar</span>
-      </button>
-      <button class="sheet-btn" id="ctxDelete" style="color: #ff4d4d;">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        <span>Borrar</span>
-      </button>
+      <button class="sheet-btn" id="ctxAddTo"><svg viewBox="0 0 24 24"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg><span>Agregar a</span></button>
+      <button class="sheet-btn" id="ctxPlayNext"><svg viewBox="0 0 24 24"><path d="M3 18h12v-2H3v2zm0-4h12v-2H3v2zm0-4h12V8H3v2zm14-6v12l5-6-5-6z"/></svg><span>Siguiente</span></button>
+      <button class="sheet-btn" id="ctxShare"><svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg><span>Compartir</span></button>
+      <button class="sheet-btn" id="ctxHide"><svg viewBox="0 0 24 24"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg><span>Ocultar</span></button>
+      <button class="sheet-btn" id="ctxDelete" style="color: #ff4d4d;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span>Borrar</span></button>
     </div>
   </div>
   <div id="sheet-overlay" class="menu-overlay"></div>
