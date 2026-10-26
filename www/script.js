@@ -452,7 +452,7 @@ if (progressBar) {
 }
 
 // ============================================================
-// 9. ESCANEAR (CON FILTRO ANTI-BASURA DE 60 SEGUNDOS)
+// 9. ESCANEAR (CON FILTRO ANTI-BASURA Y CORRECCIÓN PARA CELULARES VIEJOS)
 // ============================================================
 async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
@@ -484,7 +484,10 @@ async function escanearMusicaNativa() {
         // 2. FILTRO DE DURACIÓN: Ignorar audios menores a 1 minuto (60 segundos)
         // Comprobamos si viene en milisegundos o segundos para hacerlo a prueba de fallos
         const duracionSegundos = t.duration > 1000 ? t.duration / 1000 : t.duration;
-        if (duracionSegundos < 60) return false; 
+        
+        // CORRECCIÓN: Si la duración es mayor a 0, aplicamos el filtro. 
+        // Si es 0 (error común en celulares viejos donde no lee los metadatos), lo dejamos pasar.
+        if (duracionSegundos > 0 && duracionSegundos < 60) return false; 
 
         // 3. FILTRO DE RUTAS: Excluir carpetas de mensajería y sistema
         const urlMinuscula = t.url.toLowerCase();
