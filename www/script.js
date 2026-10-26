@@ -16,6 +16,12 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
 let playbackMode = 'normal'; 
 
+// --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
+const CURRENT_APP_VERSION = "1.1.9"; 
+const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
+const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
+// --------------------------------------------
+
 let totalListeningSeconds = parseInt(localStorage.getItem('ymPlay_totalListenTime') || '0');
 let playCounts = JSON.parse(localStorage.getItem('ymPlay_playCounts') || '{}');
 
@@ -680,7 +686,6 @@ if($('btnAutoColor')) {
         if (savedBg) {
             extraerColorDominante(savedBg);
         } else {
-            // Si no hay foto, volvemos al azul por defecto
             aplicarColorTema("#00d2ff", 0, 210, 255);
             document.querySelector('.palette-dot[data-color="ocean"]').classList.add('active');
             localStorage.removeItem('ymPlay_manualTheme');
@@ -908,6 +913,31 @@ function setupBackButton() {
   }
 }
 
+// Función para buscar actualizaciones en GitHub
+async function checkForUpdates() {
+  try {
+    const response = await fetch(UPDATE_JSON_URL);
+    const data = await response.json();
+    
+    if (data.version !== CURRENT_APP_VERSION) {
+      const banner = $('update-banner');
+      if (banner) {
+        banner.classList.add('show');
+        
+        $('downloadUpdateBtn').onclick = () => {
+            window.open(UPDATE_DOWNLOAD_URL, '_blank');
+        };
+        
+        $('closeUpdateBtn').onclick = () => {
+            banner.classList.remove('show');
+        };
+      }
+    }
+  } catch (error) {
+    console.log("No se pudo comprobar la actualización", error);
+  }
+}
+
 // ============================================================
 // 14. ARRANQUE FINAL
 // ============================================================
@@ -915,8 +945,16 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   loadCachedTracks();
   
+  // --- AQUI ESTA EL CAMBIO DE LOS VALORES POR DEFECTO ---
   const savedOpacity = localStorage.getItem('ymPlay_uiOpacity');
-  if (savedOpacity) { uiOpacitySlider.value = savedOpacity; document.documentElement.style.setProperty('--ui-transparency', savedOpacity); }
+  if (savedOpacity) { 
+      uiOpacitySlider.value = savedOpacity; 
+      document.documentElement.style.setProperty('--ui-transparency', savedOpacity); 
+  } else {
+      // Si es la primera vez que abre, ponemos 0.2 (máxima transparencia)
+      uiOpacitySlider.value = 0.2;
+      document.documentElement.style.setProperty('--ui-transparency', 0.2);
+  }
 
   const savedThemeColor = localStorage.getItem('ymPlay_manualTheme');
   if (savedThemeColor) {
@@ -936,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const savedBg = localStorage.getItem('ymPlay_customBg'); 
-  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
+  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0; // Por defecto 0 si no hay nada guardado
   if (savedBg) { 
       if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
       applyBackground(savedBg, savedBlur); 
