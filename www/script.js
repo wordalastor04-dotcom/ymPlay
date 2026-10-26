@@ -107,7 +107,7 @@ let pressTimer;
 let wakeLock = null;
 
 // ============================================================
-// 1. APARIENCIA (OPACIDAD Y FONDO)
+// 1. APARIENCIA (OPACIDAD, FONDO Y COLOR DINÁMICO)
 // ============================================================
 if (uiOpacitySlider) {
     uiOpacitySlider.addEventListener('input', (e) => {
@@ -124,6 +124,52 @@ function applyBackground(imageSrc, blurAmount) {
     document.body.classList.add('has-custom-bg'); 
 }
 
+// NUEVA FUNCIÓN: Extrae el color dominante de la imagen subida
+function extraerColorDominante(imageSrc) {
+    const img = new Image();
+    img.src = imageSrc;
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Reducimos la imagen a 50x50 para que el cálculo sea instantáneo y no congele el celular
+        canvas.width = 50;
+        canvas.height = 50;
+        ctx.drawImage(img, 0, 0, 50, 50);
+        
+        const imageData = ctx.getImageData(0, 0, 50, 50).data;
+        let r = 0, g = 0, b = 0, count = 0;
+        
+        // Recorremos los píxeles ignorando los muy oscuros o muy claros
+        for (let i = 0; i < imageData.length; i += 4) {
+            if (imageData[i+3] < 128) continue; // Ignorar transparencias
+            if (imageData[i] + imageData[i+1] + imageData[i+2] < 50) continue; // Ignorar negros
+            if (imageData[i] + imageData[i+1] + imageData[i+2] > 700) continue; // Ignorar blancos
+            
+            r += imageData[i];
+            g += imageData[i+1];
+            b += imageData[i+2];
+            count++;
+        }
+        
+        if (count === 0) return; 
+        
+        r = Math.floor(r / count);
+        g = Math.floor(g / count);
+        b = Math.floor(b / count);
+        
+        const colorHex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        
+        // Aplicamos el nuevo color a la interfaz
+        document.documentElement.style.setProperty('--accent', colorHex);
+        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+        
+        // Quitamos la selección de las paletas predefinidas para que no haya conflicto
+        document.querySelectorAll('.palette-dot').forEach(d => d.classList.remove('active'));
+    };
+}
+
 if (bgInput) { 
     bgInput.addEventListener('change', (e) => { 
         const file = e.target.files[0]; 
@@ -136,6 +182,10 @@ if (bgInput) {
                     localStorage.setItem('ymPlay_bgBlur', '0'); 
                     if (bgBlurSlider) bgBlurSlider.value = 0; 
                     applyBackground(base64Image, 0); 
+                    
+                    // Llamamos a la función para que cambie el color de la app
+                    extraerColorDominante(base64Image);
+                    
                 } catch (err) { alert("La imagen es muy grande para guardarla."); } 
             }; 
             reader.readAsDataURL(file); 
@@ -739,14 +789,12 @@ function volverALista() {
   if(screenMain) screenMain.style.display = 'flex'; 
   
   if (currentPlaylistId !== null) {
-      // Si venimos de una playlist, restauramos la vista de la playlist
       viewSongs.style.display = 'none'; 
       viewPlaylists.style.display = 'none'; 
       viewPlaylistDetail.style.display = 'flex'; 
       mainTabs.style.display = 'none';
       renderPlaylistDetail();
   } else {
-      // Si venimos de la lista general o favoritos, restauramos esa pestaña
       showView(currentTab || 'songs');
   }
 }
@@ -791,13 +839,9 @@ function setupBackButton() {
   
   if (App) {
     App.addListener('backButton', () => {
-      // 1. Cerrar Menú Lateral
       if (sideMenu && sideMenu.classList.contains('open')) { closeMenu(); return; }
-      
-      // 2. Cerrar Menú Contextual (Mantener presionado)
       if (selectionMenu && selectionMenu.classList.contains('show')) { hideSelectionMenu(); return; }
       
-      // 3. Cerrar Modales (Playlists)
       if (modalSelectSongs.style.display === 'flex' || modalNewPlaylist.style.display === 'flex' || modalCtxPlaylists.style.display === 'flex') {
         modalSelectSongs.style.display = 'none'; 
         modalNewPlaylist.style.display = 'none'; 
@@ -805,26 +849,16 @@ function setupBackButton() {
         return;
       }
       
-      // 4. Si estamos en el reproductor, volver a la lista
-      if (screenPlayer && screenPlayer.style.display === 'flex') { 
-        volverALista(); 
-        return; 
-      }
+      if (screenPlayer && screenPlayer.style.display === 'flex') { volverALista(); return; }
       
-      // 5. Si estamos en detalle de playlist, volver a playlists
       if (viewPlaylistDetail && viewPlaylistDetail.style.display === 'flex') { 
         currentPlaylistId = null;
         showView('playlists'); 
         return; 
       }
       
-      // 6. Si estamos en Favoritos o Playlists, volver a Canciones
-      if (currentTab === 'favorites' || currentTab === 'playlists') { 
-        showView('songs'); 
-        return; 
-      }
+      if (currentTab === 'favorites' || currentTab === 'playlists') { showView('songs'); return; }
       
-      // 7. Si no hay nada más que hacer, salir de la app
       App.exitApp();
     });
   } else {
@@ -851,7 +885,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const savedBg = localStorage.getItem('ymPlay_customBg'); 
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
-  if (savedBg) { if (bgBlurSlider) bgBlurSlider.value = savedBlur; applyBackground(savedBg, savedBlur); }
+  if (savedBg) { 
+      if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
+      applyBackground(savedBg, savedBlur); 
+      // Aquí aplicamos el color dominante guardado al iniciar la app
+      extraerColorDominante(savedBg); 
+  }
   
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
   checkForUpdates();
