@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -25,6 +25,10 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+
+      # Nuevo paso: genera la carpeta android desde cero
+      - name: Add Android Platform
+        run: npx cap add android
 
       - name: Capacitor Sync
         run: npx cap sync android
