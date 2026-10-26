@@ -7,7 +7,7 @@
   --text-primary: #ffffff; --text-secondary: #8b98b0;
   --slider-track: rgba(255, 255, 255, 0.1); --border-color: rgba(255, 255, 255, 0.08);
   --shadow: 0 20px 40px rgba(0,0,0,0.5);
-  --ui-transparency: 0.2; /* <--- CAMBIADO A 0.2 */
+  --ui-transparency: 0.2; /* Máxima transparencia por defecto */
 }
 [data-theme="light"] {
   --bg-body: #e2e8f0; 
@@ -45,9 +45,21 @@ body {
 body.has-custom-bg #custom-bg { display: block; }
 
 /* --- CONTENEDOR PRINCIPAL --- */
-.player-app { width: 100%; max-width: 480px; height: 100%; background: var(--bg-card); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; flex-direction: column; position: relative; overflow: hidden; transition: background 0.3s ease; }
-body.has-custom-bg .player-app { background: rgba(15, 23, 42, var(--ui-transparency)); backdrop-filter: none; -webkit-backdrop-filter: none; }
-body.has-custom-bg[data-theme="light"] .player-app { background: rgba(255, 255, 255, var(--ui-transparency)); }
+.player-app { 
+  width: 100%; max-width: 480px; height: 100%; 
+  background: var(--bg-card); 
+  /* REDUCIDO EL BLUR DE 15px A 5px PARA AHORRAR RAM */
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); 
+  display: flex; flex-direction: column; position: relative; overflow: hidden; 
+  transition: background 0.3s ease; 
+}
+body.has-custom-bg .player-app { 
+  background: rgba(15, 23, 42, var(--ui-transparency)); 
+  backdrop-filter: none; -webkit-backdrop-filter: none; 
+}
+body.has-custom-bg[data-theme="light"] .player-app { 
+  background: rgba(255, 255, 255, var(--ui-transparency)); 
+}
 @media (min-width: 500px) { .player-app { height: 90vh; height: 90dvh; border-radius: 30px; border: 1px solid var(--border-color); box-shadow: var(--shadow); } }
 
 /* --- MENÚ LATERAL --- */
@@ -63,6 +75,7 @@ body.has-custom-bg[data-theme="light"] .player-app { background: rgba(255, 255, 
 
 /* --- PANTALLAS --- */
 #screen-main, #screen-player, #screen-settings { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 15px; animation: fadeIn 0.3s ease; }
+/* Ajustes transparente para que se vea el fondo */
 #screen-settings { background: transparent; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
