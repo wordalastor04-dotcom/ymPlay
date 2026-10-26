@@ -17,7 +17,7 @@ const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 let playbackMode = 'normal'; 
 
 // --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
-const CURRENT_APP_VERSION = "1.1.9"; 
+const CURRENT_APP_VERSION = "1.1.7"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 // --------------------------------------------
@@ -465,18 +465,49 @@ function nextTrack() {
   if (realIndex !== -1) cargarCancion(realIndex);
 }
 
+// --- FUNCIÓN MEJORADA PARA AURICULARES ---
 function setupMediaSession(track, coverUrl) {
   if ('mediaSession' in navigator) {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.name, artist: track.artist, album: 'ymPlay',
+        title: track.name, 
+        artist: track.artist, 
+        album: 'ymPlay',
         artwork: coverUrl ? [{ src: coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
       });
+
+      // Botones principales (Play/Pausa)
       navigator.mediaSession.setActionHandler('play', () => playAudio());
       navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      
+      // Botones de salto de pista
       navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
-    } catch (e) {}
+      
+      // Botones de mantener presionado (Adelantar / Atrasar)
+      try {
+          navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+              audio.currentTime = Math.max(audio.currentTime - (details.seekOffset || 10), 0);
+          });
+          navigator.mediaSession.setActionHandler('seekforward', (details) => {
+              audio.currentTime = Math.min(audio.currentTime + (details.seekOffset || 10), audio.duration);
+          });
+          navigator.mediaSession.setActionHandler('seekto', (details) => {
+              if (details.fastSeek && 'fastSeek' in audio) {
+                  audio.fastSeek(details.seekTime);
+                  return;
+              }
+              audio.currentTime = details.seekTime;
+          });
+          navigator.mediaSession.setActionHandler('stop', () => {
+              audio.pause();
+              audio.currentTime = 0;
+          });
+      } catch (error) {
+          console.log("Algunos comandos de búsqueda no son soportados por este Android.");
+      }
+
+    } catch (e) { console.log("Error configurando MediaSession", e); }
   }
 }
 
@@ -979,7 +1010,6 @@ document.addEventListener('DOMContentLoaded', () => {
       applyBackground(savedBg, savedBlur); 
       if (!savedThemeColor) extraerColorDominante(savedBg);
   } else {
-      // AQUÍ APLICAMOS LA FOTO POR DEFECTO
       const defaultImage = 'default-bg.jpg'; 
       applyBackground(defaultImage, 0);
   }
