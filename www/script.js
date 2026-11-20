@@ -9,24 +9,22 @@ let currentPlaylistId = null;
 let currentTab = 'songs'; 
 let currentSearchQuery = ''; 
 
+// Variables de Audio (Singleton)
 let audioCtx = null;
 let sourceNode = null;
 let analyser = null;
 let eqFilters = [];
-let isEqActive = false; 
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
+// Variables de Letras y Visualizador
 let currentLyrics = [];
 let animationFrameId = null;
 const canvas = document.getElementById('audioVisualizer');
 const canvasCtx = canvas ? canvas.getContext('2d') : null;
-const canvasTikTok = document.getElementById('audioVisualizerTikTok');
-const canvasTikTokCtx = canvasTikTok ? canvasTikTok.getContext('2d') : null;
 
 let playbackMode = 'normal'; 
 
-// --- VARIABLES DE VERSIÓN ---
-const CURRENT_APP_VERSION = "1.4.0"; 
+const CURRENT_APP_VERSION = "1.5.0"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -58,28 +56,14 @@ const bgBlurSlider = $('bgBlurSlider');
 const uiOpacitySlider = $('uiOpacitySlider');
 const customBg = document.getElementById('custom-bg');
 
-// Elementos nuevos del reproductor
 const playerBg = $('player-bg');
-const playerBgInput = $('playerBgInput');
 const quickPlayerBgInput = $('quickPlayerBgInput');
-const coverInput = $('coverInput'); // Botón nueva portada
+const coverInput = $('coverInput');
 const btnToggleLyrics = $('btnToggleLyrics');
 const btnTikTokMode = $('btnTikTokMode');
-const btnExitTikTok = $('btnExitTikTok'); // Botón salir TikTok
+const btnExitTikTok = $('btnExitTikTok');
 const lyricsBox = $('lyricsBox');
 const coverContainer = $('coverContainer');
-const normalPlayerUI = $('normal-player-ui');
-const tiktokVisualUI = $('tiktok-visual-ui');
-
-// Elementos de la vista TikTok
-const coverImgTikTok = $('coverImgTikTok');
-const songTitleTikTok = $('songTitleTikTok');
-const currentTimeTikTok = $('currentTimeTikTok');
-const totalTimeTikTok = $('totalTimeTikTok');
-const tikTokPlayBtn = $('tikTokPlayBtn');
-const tikTokPlayIcon = $('tikTokPlayIcon');
-const tikTokPrevBtn = $('tikTokPrevBtn');
-const tikTokNextBtn = $('tikTokNextBtn');
 
 const searchInput = $('searchInput');
 const clearSearchBtn = $('clearSearchBtn');
@@ -131,7 +115,6 @@ const sheetOverlay = $('sheet-overlay');
 const closeSelectionBtn = $('closeSelectionBtn');
 const ctxAddTo = $('ctxAddTo');
 const ctxPlayNext = $('ctxPlayNext');
-const ctxShare = $('ctxShare');
 const ctxHide = $('ctxHide');
 const ctxDelete = $('ctxDelete');
 const modalCtxPlaylists = $('modal-ctx-playlists');
@@ -148,103 +131,36 @@ let pressTimer;
 let wakeLock = null;
 
 // ============================================================
-// LÓGICA DE LA BARRA DE BÚSQUEDA
+// UTILIDADES: COMPRESIÓN DE IMÁGENES (Para que no falle localStorage)
 // ============================================================
-if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-        currentSearchQuery = e.target.value.toLowerCase().trim();
-        if (clearSearchBtn) clearSearchBtn.style.display = currentSearchQuery.length > 0 ? 'block' : 'none';
-        if (currentTab === 'playlist-detail') renderPlaylistDetail();
-        else renderPlaylist();
-    });
-}
-
-if (clearSearchBtn) {
-    clearSearchBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        currentSearchQuery = '';
-        clearSearchBtn.style.display = 'none';
-        if (currentTab === 'playlist-detail') renderPlaylistDetail();
-        else renderPlaylist();
-    });
-}
-
-// ============================================================
-// VISUALIZADOR DE AUDIO
-// ============================================================
-function setupAudioContext() {
-  if (sourceNode) return; 
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    sourceNode = audioCtx.createMediaElementSource(audio);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    
-    eqFilters = EQ_FREQS.map(freq => { 
-        const filter = audioCtx.createBiquadFilter(); 
-        filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0; 
-        return filter; 
-    });
-
-    let prev = sourceNode; 
-    eqFilters.forEach(f => { prev.connect(f); prev = f; }); 
-    prev.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    
-    isEqActive = true; 
-    drawVisualizer();
-  } catch (e) { console.error("Error Web Audio API:", e); }
-}
-
-function drawVisualizer() {
-    if (!analyser) return;
-    
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    
-    function draw() {
-        animationFrameId = requestAnimationFrame(draw);
-        analyser.getByteFrequencyData(dataArray);
-
-        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00d2ff';
-
-        // Dibujar en el Canvas Normal
-        if (canvasCtx && canvas.clientWidth > 0) {
-            if (canvas.width !== canvas.clientWidth) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
-            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-            const barWidth = (canvas.width / bufferLength) * 2.5;
-            let x = 0;
-            for (let i = 0; i < bufferLength; i++) {
-                const barHeight = (dataArray[i] / 255) * canvas.height;
-                canvasCtx.fillStyle = accentColor;
-                canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-                x += barWidth + 1;
-            }
-        }
-
-        // Dibujar en el Canvas TikTok
-        if (canvasTikTokCtx && canvasTikTok.clientWidth > 0 && document.body.classList.contains('tiktok-mode')) {
-            if (canvasTikTok.width !== canvasTikTok.clientWidth) { canvasTikTok.width = canvasTikTok.clientWidth; canvasTikTok.height = canvasTikTok.clientHeight; }
-            canvasTikTokCtx.clearRect(0, 0, canvasTikTok.width, canvasTikTok.height);
-            const barWidthTikTok = (canvasTikTok.width / bufferLength) * 2;
-            let xTikTok = 0;
-            for (let i = 0; i < bufferLength; i++) {
-                const barHeight = (dataArray[i] / 255) * canvasTikTok.height;
-                // Hacerlo parecer una línea en el centro
-                const y = (canvasTikTok.height / 2) - (barHeight / 2);
-                canvasTikTokCtx.fillStyle = accentColor;
-                canvasTikTokCtx.fillRect(xTikTok, y, barWidthTikTok, barHeight);
-                xTikTok += barWidthTikTok + 1;
-            }
-        }
-    }
-    draw();
+function resizeImage(file, maxWidth, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const scaleSize = maxWidth / img.width;
+            canvas.width = maxWidth;
+            canvas.height = img.height * scaleSize;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            callback(canvas.toDataURL('image/jpeg', 0.7)); // 0.7 calidad es suficiente y pesa poco
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 // ============================================================
-// COLOR AUTOMÁTICO Y FONDOS
+// COLORES Y FONDOS
 // ============================================================
-function extractColorFromCover(imageSrc) {
+function aplicarColorTema(hex, r, g, b) {
+    document.documentElement.style.setProperty('--accent', hex);
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+    document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${hex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+}
+
+function extraerColorDominante(imageSrc, isCover = false) {
     if (!imageSrc) return;
     const img = new Image();
     img.crossOrigin = "Anonymous";
@@ -264,73 +180,150 @@ function extractColorFromCover(imageSrc) {
             r = Math.floor(r/count); g = Math.floor(g/count); b = Math.floor(b/count);
             const hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
             
-            // Aplicar a las variables de los anillos (siempre)
-            document.documentElement.style.setProperty('--cover-color', hex);
-            document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
+            if (isCover) {
+                document.documentElement.style.setProperty('--cover-color', hex);
+                document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
+            }
 
-            // Si no hay un tema manual seleccionado, aplicar a toda la app
+            // Si no hay color manual, aplicar automático
             if (!localStorage.getItem('ymPlay_manualTheme')) {
-                document.documentElement.style.setProperty('--accent', hex);
-                document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-                document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${hex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+                aplicarColorTema(hex, r, g, b);
             }
         }
     };
 }
 
-function applyPlayerBackground(imageSrc) {
-    if (!playerBg) return;
-    if (imageSrc) {
-        playerBg.style.backgroundImage = `url(${imageSrc})`;
-        playerBg.style.opacity = '1';
-    } else {
-        playerBg.style.backgroundImage = 'none';
-        playerBg.style.opacity = '0';
+// ============================================================
+// AUDIO CONTEXT Y ECUALIZADOR (Singleton Fix)
+// ============================================================
+function initAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        sourceNode = audioCtx.createMediaElementSource(audio);
+        
+        // Crear Filtros
+        eqFilters = EQ_FREQS.map(freq => { 
+            const filter = audioCtx.createBiquadFilter(); 
+            filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0; 
+            return filter; 
+        });
+
+        // Conectar cadena
+        let prev = sourceNode; 
+        eqFilters.forEach(f => { prev.connect(f); prev = f; }); 
+        
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        prev.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        
+        drawVisualizer();
     }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
-function handlePlayerBgUpload(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const base64 = event.target.result;
-            try {
-                localStorage.setItem('ymPlay_playerBg', base64);
-                applyPlayerBackground(base64);
-            } catch (err) { alert("Imagen muy grande."); }
-        };
-        reader.readAsDataURL(file);
+function drawVisualizer() {
+    if (!analyser || !canvasCtx) return;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    function draw() {
+        animationFrameId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00d2ff';
+
+        if (canvas.width !== canvas.clientWidth) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let x = 0;
+        for (let i = 0; i < bufferLength; i++) {
+            const barHeight = (dataArray[i] / 255) * canvas.height;
+            canvasCtx.fillStyle = accentColor;
+            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+            x += barWidth + 1;
+        }
     }
+    draw();
 }
 
-if (playerBgInput) playerBgInput.addEventListener('change', handlePlayerBgUpload);
-if (quickPlayerBgInput) quickPlayerBgInput.addEventListener('change', handlePlayerBgUpload);
+// Sliders EQ
+document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
+  slider.addEventListener('input', () => { 
+    initAudioContext(); 
+    if (eqFilters[i]) eqFilters[i].gain.value = parseFloat(slider.value); 
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); 
+  });
+});
 
-// Cambiar Portada de la Canción
+document.getElementById('eqPresets')?.addEventListener('click', e => {
+  initAudioContext();
+  const btn = e.target.closest('.preset-btn'); if (!btn) return;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
+  const gains = { flat: [0,0,0,0,0], rock: [5,3,-1,3,5], pop: [-1,2,4,2,-1], jazz: [3,1,-2,1,3], vocal: [-2,0,4,3,-1] }[btn.dataset.preset] || [0,0,0,0,0];
+  document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
+});
+
+document.getElementById('eqResetBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
+        slider.value = 0;
+        if (eqFilters[i]) eqFilters[i].gain.value = 0;
+    });
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.preset-btn[data-preset="flat"]').classList.add('active');
+});
+
+// ============================================================
+// SUBIDA DE IMÁGENES (Con compresión)
+// ============================================================
+if (bgInput) {
+    bgInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            resizeImage(file, 1080, (base64) => {
+                try {
+                    localStorage.setItem('ymPlay_customBg', base64);
+                    customBg.style.backgroundImage = `url(${base64})`;
+                    document.body.classList.add('has-custom-bg');
+                    extraerColorDominante(base64); // Cambia el color automáticamente
+                } catch (err) { alert("Imagen demasiado grande, intenta con otra."); }
+            });
+        }
+    });
+}
+
+if (quickPlayerBgInput) {
+    quickPlayerBgInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            resizeImage(file, 1080, (base64) => {
+                try {
+                    localStorage.setItem('ymPlay_playerBg', base64);
+                    if(playerBg) { playerBg.style.backgroundImage = `url(${base64})`; playerBg.style.opacity = '1'; }
+                } catch (err) { alert("Imagen demasiado grande, intenta con otra."); }
+            });
+        }
+    });
+}
+
 if (coverInput) {
     coverInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file && currentIndex !== -1) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const base64 = event.target.result;
+            resizeImage(file, 800, (base64) => {
                 tracks[currentIndex].cover = base64;
                 saveTracksCache();
                 
-                // Actualizar UI
                 if(coverImg) { coverImg.src = base64; coverImg.style.display = 'block'; }
-                if(coverImgTikTok) coverImgTikTok.src = base64;
                 if(miniCover) miniCover.src = base64;
-                extractColorFromCover(base64);
-            };
-            reader.readAsDataURL(file);
+                extraerColorDominante(base64, true);
+            });
         }
     });
 }
 
 // ============================================================
-// LÓGICA DE LETRAS (LRC)
+// LETRAS (LRC)
 // ============================================================
 function parseLRC(lrcText) {
     const lines = lrcText.split('\n');
@@ -403,20 +396,14 @@ if (saveLyricsBtn) {
 if (btnTikTokMode) {
     btnTikTokMode.addEventListener('click', () => {
         document.body.classList.add('tiktok-mode');
-        if(normalPlayerUI) normalPlayerUI.style.display = 'none';
-        if(tiktokVisualUI) tiktokVisualUI.style.display = 'flex';
         if(btnExitTikTok) btnExitTikTok.style.display = 'flex';
-        setTimeout(() => { if(canvasTikTok) { canvasTikTok.width = canvasTikTok.clientWidth; canvasTikTok.height = canvasTikTok.clientHeight; } }, 100);
     });
 }
 
 if (btnExitTikTok) {
     btnExitTikTok.addEventListener('click', () => {
         document.body.classList.remove('tiktok-mode');
-        if(normalPlayerUI) normalPlayerUI.style.display = 'flex';
-        if(tiktokVisualUI) tiktokVisualUI.style.display = 'none';
         if(btnExitTikTok) btnExitTikTok.style.display = 'none';
-        setTimeout(() => { if(canvas) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; } }, 100);
     });
 }
 
@@ -428,7 +415,7 @@ if (btnToggleLyrics) {
 }
 
 // ============================================================
-// REPRODUCTOR Y LÓGICA PRINCIPAL
+// REPRODUCTOR Y LÓGICA
 // ============================================================
 function cargarCancion(index, startTime = 0) {
   if (index < 0 || index >= tracks.length) return;
@@ -446,7 +433,6 @@ function cargarCancion(index, startTime = 0) {
     audio.addEventListener('loadedmetadata', function onMetadata() { audio.currentTime = startTime; audio.removeEventListener('loadedmetadata', onMetadata); });
   }
 
-  // Actualizar UI Normal
   if(songTitle) songTitle.textContent = track.name;
   if(songArtist) songArtist.textContent = track.artist;
   if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
@@ -458,19 +444,11 @@ function cargarCancion(index, startTime = 0) {
   if (track.cover) {
     coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
     if(coverImg) { coverImg.src = coverUrl; coverImg.style.display = 'block'; }
-    extractColorFromCover(coverUrl);
+    extraerColorDominante(coverUrl, true);
   } else if (coverImg) { 
       coverImg.style.display = 'none'; 
   }
 
-  // Actualizar UI TikTok
-  if(songTitleTikTok) songTitleTikTok.textContent = track.name;
-  if(coverImgTikTok) {
-      if(coverUrl) coverImgTikTok.src = coverUrl;
-      else coverImgTikTok.src = ''; // O una imagen por defecto
-  }
-
-  // Actualizar Mini Player
   if (miniPlayer) {
     miniPlayer.style.display = 'flex'; 
     miniTitle.textContent = track.name;
@@ -478,10 +456,15 @@ function cargarCancion(index, startTime = 0) {
     if (coverUrl) { miniCover.src = coverUrl; miniCover.style.display = 'block'; } else { miniCover.style.display = 'none'; }
   }
 
-  // Cargar Letras y fondo
   loadLyricsForTrack(track);
+  
   const savedPlayerBg = localStorage.getItem('ymPlay_playerBg');
-  applyPlayerBackground(savedPlayerBg);
+  if (savedPlayerBg && playerBg) {
+      playerBg.style.backgroundImage = `url(${savedPlayerBg})`;
+      playerBg.style.opacity = '1';
+  } else if(playerBg) {
+      playerBg.style.backgroundImage = 'none';
+  }
 
   updatePlaylistHighlight();
   setupMediaSession(track, coverUrl);
@@ -537,36 +520,21 @@ function setupMediaSession(track, coverUrl) {
   }
 }
 
-// SINCRONIZACIÓN DE TIEMPO Y BOTONES
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
-  const timeStr = formatTime(audio.currentTime);
-  const totalStr = formatTime(audio.duration);
-  
   if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
-  if(currentTimeEl) currentTimeEl.textContent = timeStr;
-  if(totalTimeEl) totalTimeEl.textContent = totalStr;
-  if(currentTimeTikTok) currentTimeTikTok.textContent = timeStr;
-  if(totalTimeTikTok) totalTimeTikTok.textContent = totalStr;
-  
+  if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
+  if(totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration);
   updateLyrics(audio.currentTime);
-});
-
-audio.addEventListener('loadedmetadata', () => {
-    const totalStr = formatTime(audio.duration);
-    if(totalTimeEl) totalTimeEl.textContent = totalStr;
-    if(totalTimeTikTok) totalTimeTikTok.textContent = totalStr;
 });
 
 audio.addEventListener('play', () => { 
   const pauseIcon = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>';
   if(playIcon) playIcon.innerHTML = pauseIcon; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = `<svg viewBox="0 0 24 24">${pauseIcon}</svg>`;
-  if(tikTokPlayIcon) tikTokPlayIcon.innerHTML = pauseIcon;
   
   requestWakeLock(); 
-  setupAudioContext(); 
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  initAudioContext(); 
   
   if(coverContainer) coverContainer.classList.add('is-playing');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
@@ -576,7 +544,6 @@ audio.addEventListener('pause', () => {
   const playIconSVG = '<path d="M8 5v14l11-7z"/>';
   if(playIcon) playIcon.innerHTML = playIconSVG; 
   if(miniPlayBtn) miniPlayBtn.innerHTML = `<svg viewBox="0 0 24 24">${playIconSVG}</svg>`;
-  if(tikTokPlayIcon) tikTokPlayIcon.innerHTML = playIconSVG;
   
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   if(coverContainer) coverContainer.classList.remove('is-playing');
@@ -589,7 +556,7 @@ audio.addEventListener('ended', () => {
 });
 
 // ============================================================
-// FUNCIONES RESTANTES (Escaneo, Playlists, Eventos UI, etc.)
+// SISTEMA Y UTILIDADES
 // ============================================================
 async function iniciarServicioSegundoPlano() {
     const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
@@ -736,7 +703,7 @@ async function escanearMusicaNativa() {
         
         tracks = newTracks.map(t => ({ 
             ...t, 
-            cover: existingCovers[t.url] || t.cover, // Mantiene la portada personalizada
+            cover: existingCovers[t.url] || t.cover, 
             hidden: hiddenUrls.includes(t.url), 
             isFavorite: favUrls.includes(t.url) 
         }));
@@ -798,10 +765,6 @@ window.restaurarCancion = function(url) {
 
 if($('openSettingsBtn')) $('openSettingsBtn').addEventListener('click', () => { closeMenu(); screenMain.style.display = 'none'; screenPlayer.style.display = 'none'; screenSettings.style.display = 'flex'; updateStatsUI(); renderHiddenSongs(); });
 if($('closeSettingsBtn')) $('closeSettingsBtn').addEventListener('click', () => { screenSettings.style.display = 'none'; screenMain.style.display = 'flex'; });
-if($('toggleAudioFocus')) {
-    $('toggleAudioFocus').checked = localStorage.getItem('ymPlay_audioFocus') === 'true';
-    $('toggleAudioFocus').addEventListener('change', (e) => { localStorage.setItem('ymPlay_audioFocus', e.target.checked); });
-}
 
 document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -809,9 +772,7 @@ document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
         btn.classList.add('active');
         const r = parseInt(colorHex.slice(1,3), 16); const g = parseInt(colorHex.slice(3,5), 16); const b = parseInt(colorHex.slice(5,7), 16);
-        document.documentElement.style.setProperty('--accent', colorHex);
-        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+        aplicarColorTema(colorHex, r, g, b);
         localStorage.setItem('ymPlay_manualTheme', colorHex);
     });
 });
@@ -822,9 +783,7 @@ if($('customColorPicker')) {
         document.querySelector('.custom-color-picker').style.background = colorHex;
         document.querySelector('.custom-color-picker').classList.add('active');
         const r = parseInt(colorHex.slice(1,3), 16); const g = parseInt(colorHex.slice(3,5), 16); const b = parseInt(colorHex.slice(5,7), 16);
-        document.documentElement.style.setProperty('--accent', colorHex);
-        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
+        aplicarColorTema(colorHex, r, g, b);
         localStorage.setItem('ymPlay_manualTheme', colorHex);
     });
 }
@@ -834,10 +793,11 @@ if($('btnAutoColor')) {
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
         document.querySelector('.custom-color-picker').style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
         if (currentIndex !== -1 && tracks[currentIndex] && tracks[currentIndex].cover) {
-            extractColorFromCover(tracks[currentIndex].cover);
+            extraerColorDominante(tracks[currentIndex].cover, true);
+        } else if (localStorage.getItem('ymPlay_customBg')) {
+            extraerColorDominante(localStorage.getItem('ymPlay_customBg'));
         } else {
-            document.documentElement.style.setProperty('--accent', "#00d2ff");
-            document.documentElement.style.setProperty('--accent-glow', "rgba(0, 210, 255, 0.4)");
+            aplicarColorTema("#00d2ff", 0, 210, 255);
         }
     });
 }
@@ -919,7 +879,7 @@ function volverALista() {
   if (currentPlaylistId !== null) { viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'flex'; mainTabs.style.display = 'none'; renderPlaylistDetail(); } 
   else { showView(currentTab || 'songs'); }
 }
-function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(currentTimeTikTok) currentTimeTikTok.textContent = '0:00'; }
+function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(totalTimeEl) totalTimeEl.textContent = '0:00'; }
 function formatTime(sec) { if (isNaN(sec) || !isFinite(sec)) return '0:00'; return `${Math.floor(sec/60)}:${Math.floor(sec%60).toString().padStart(2, '0')}`; }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -928,9 +888,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 if(playBtn) playBtn.addEventListener('click', togglePlay);
 if(prevBtn) prevBtn.addEventListener('click', prevTrack);
 if(nextBtn) nextBtn.addEventListener('click', nextTrack);
-if(tikTokPlayBtn) tikTokPlayBtn.addEventListener('click', togglePlay);
-if(tikTokPrevBtn) tikTokPrevBtn.addEventListener('click', prevTrack);
-if(tikTokNextBtn) tikTokNextBtn.addEventListener('click', nextTrack);
 
 if(backToListBtn) backToListBtn.addEventListener('click', volverALista);
 if(menuBtn) menuBtn.addEventListener('click', openMenu);
@@ -1016,8 +973,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedThemeColor = localStorage.getItem('ymPlay_manualTheme');
   if (savedThemeColor) {
       const r = parseInt(savedThemeColor.slice(1,3), 16); const g = parseInt(savedThemeColor.slice(3,5), 16); const b = parseInt(savedThemeColor.slice(5,7), 16);
-      document.documentElement.style.setProperty('--accent', savedThemeColor);
-      document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+      aplicarColorTema(savedThemeColor, r, g, b);
       const matchBtn = document.querySelector(`.color-option[data-color="${savedThemeColor}"]`);
       if (matchBtn) matchBtn.classList.add('active');
       else { const customBtn = document.querySelector('.custom-color-picker'); if(customBtn) { customBtn.style.background = savedThemeColor; customBtn.classList.add('active'); } }
@@ -1027,9 +983,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0; 
   if (savedBg) { 
       if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
-      applyBackground(savedBg, savedBlur); 
-  } else {
-      applyBackground('default-bg.jpg', 0);
+      customBg.style.backgroundImage = `url(${savedBg})`;
+      document.body.classList.add('has-custom-bg');
+      customBg.style.filter = `blur(${savedBlur}px)`;
+      if (!savedThemeColor) extraerColorDominante(savedBg); // Extrae el color del fondo si no hay color manual
   }
   
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
