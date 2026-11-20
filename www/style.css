@@ -33,11 +33,9 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-body); 
 #custom-bg { position: fixed; inset: 0; z-index: -2; background-size: cover; background-position: center; opacity: 1; display: none; pointer-events: none; filter: blur(0px); transition: filter 0.2s ease; }
 body.has-custom-bg #custom-bg { display: block; }
 
-/* El contenedor principal ahora toma el color de fondo dinámico */
-.player-app { width: 100%; max-width: 480px; height: 100%; background: var(--bg-card); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: flex; flex-direction: column; position: relative; overflow: hidden; transition: background 0.5s; }
+.player-app { width: 100%; max-width: 480px; height: 100%; background: var(--bg-card); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: flex; flex-direction: column; position: relative; overflow: hidden; transition: background 0.5s; z-index: 10;}
 body.has-custom-bg .player-app { background: rgba(15, 23, 42, var(--ui-transparency)); backdrop-filter: none; -webkit-backdrop-filter: none; }
 
-/* MENÚ LATERAL */
 .side-menu { position: fixed; top: 0; left: -280px; width: 260px; height: 100vh; height: 100dvh; background: var(--bg-card-solid); z-index: 1000; transition: left 0.3s; box-shadow: 2px 0 15px rgba(0,0,0,0.5); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 40px; transition: left 0.3s, background 0.5s; }
 .side-menu.open { left: 0; }
 .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;}
@@ -45,23 +43,12 @@ body.has-custom-bg .player-app { background: rgba(15, 23, 42, var(--ui-transpare
 .menu-list li button, .menu-btn { width: 100%; padding: 12px; background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 10px; text-align: left; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
 .menu-list li button:active, .menu-btn:active { background: var(--slider-track); }
 
-/* BOTÓN DE AJUSTES VISIBLE */
-.btn-settings {
-    background: var(--accent) !important;
-    color: #000 !important; /* Texto oscuro sobre el color brillante */
-    font-weight: 700 !important;
-    border: none !important;
-    text-align: center !important;
-    margin-bottom: 10px;
-    box-shadow: 0 4px 10px var(--accent-glow);
-    border-radius: 10px;
-}
-[data-theme="light"] .btn-settings { color: #fff !important; } /* En modo claro, texto blanco */
+.btn-settings { background: var(--accent) !important; color: #000 !important; font-weight: 700 !important; border: none !important; text-align: center !important; margin-bottom: 10px; box-shadow: 0 4px 10px var(--accent-glow); border-radius: 10px; }
+[data-theme="light"] .btn-settings { color: #fff !important; }
 
 .menu-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .menu-overlay.active { opacity: 1; pointer-events: auto; }
 
-/* PANTALLAS */
 #screen-main, #screen-player, #screen-settings { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 15px; animation: fadeIn 0.3s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -99,14 +86,14 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .mini-btn { background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 5px; }
 .mini-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-/* REPRODUCTOR */
-#screen-player { position: relative; overflow: hidden; padding: 0; }
+#screen-player { position: relative; overflow: hidden; padding: 0; z-index: 10;}
 .player-bg-image { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity 0.5s ease; filter: blur(15px) brightness(0.3); transform: scale(1.1); }
 .player-content { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; padding: 15px; padding-top: env(safe-area-inset-top); }
 
-.aesthetic-player { position: relative; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 15px; display: flex; gap: 15px; backdrop-filter: blur(10px); margin-top: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+/* CAJA AESTHETIC */
+.aesthetic-player { position: relative; width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 15px; display: flex; gap: 15px; backdrop-filter: blur(10px); margin-top: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); transition: all 0.5s ease; }
 
-.tiktok-borders { position: absolute; width: 24px; height: 24px; border: 2px solid #fff; opacity: 0.6; }
+.tiktok-borders { position: absolute; width: 24px; height: 24px; border: 2px solid #fff; opacity: 0.8; }
 .top-left { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
 .top-right { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
 .bottom-left { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
@@ -114,11 +101,24 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 
 .aesthetic-left { width: 120px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .cover-wrapper { position: relative; width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
-.decorative-ring { position: absolute; border-radius: 50%; pointer-events: none; border: 2px dashed var(--cover-color, var(--accent)); box-shadow: 0 0 15px var(--cover-glow, var(--accent-glow)), inset 0 0 10px var(--cover-glow); opacity: 0.6; transition: border-color 0.5s ease, box-shadow 0.5s ease; }
-.ring-1 { width: 115%; height: 115%; animation: spin 12s linear infinite; }
-.ring-2 { width: 130%; height: 130%; animation: spin-reverse 18s linear infinite; border-style: solid; border-width: 1px; opacity: 0.3; }
+
+/* EL ARO DE IMAGEN (GIRA Y IGNORA MARCA DE AGUA) */
+.image-ring {
+    position: absolute;
+    width: 140%; height: 140%;
+    background: url('1795140499434.png') no-repeat center center;
+    background-size: contain;
+    animation: spin 15s linear infinite;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 10px var(--cover-glow));
+    
+    /* MAGIA: Oculta el fondo oscuro y recorta las esquinas */
+    mix-blend-mode: screen;
+    clip-path: circle(48%); 
+}
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes spin-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
 
 .cover-container { position: relative; width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: var(--bg-card-solid); box-shadow: 0 5px 15px rgba(0,0,0,0.6), 0 0 20px var(--cover-glow); z-index: 2; }
 .cover-container.is-playing { animation: breathe 3s ease-in-out infinite; }
@@ -126,7 +126,7 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .cover-container .cover-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 40px; opacity: 0.3; }
 .cover-container img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; }
 
-.aesthetic-right { flex: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+.aesthetic-right { flex: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; z-index: 2;}
 .song-title { font-size: 18px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
 .song-artist { font-size: 13px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
 .time-row { font-family: monospace; font-size: 12px; font-weight: 600; color: #fff; margin-bottom: 10px; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px; align-self: flex-start; }
@@ -175,16 +175,17 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .eq-band input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px var(--accent); }
 .btn-reset-eq { display: block; margin: 15px auto; padding: 8px 16px; border: 1px solid #ff4d4d; background: transparent; color: #ff4d4d; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
-/* MODO TIKTOK */
-body.tiktok-mode #normal-player-ui { display: flex !important; flex-direction: column; justify-content: center; height: 100%; }
+/* MODO TIKTOK (CENTRADO PERFECTO) */
+body.tiktok-mode #normal-player-ui { display: flex !important; flex-direction: column; justify-content: center; align-items: center; height: 100%; }
 body.tiktok-mode .top-bar { display: none !important; }
 body.tiktok-mode .song-info-bottom { display: none !important; }
 body.tiktok-mode .progress-section { display: none !important; }
 body.tiktok-mode .controls { display: none !important; }
 body.tiktok-mode .playback-modes { display: none !important; }
 body.tiktok-mode .bottom-panel { display: none !important; }
-body.tiktok-mode .aesthetic-player { transform: scale(1.1); margin: 0; }
-body.tiktok-mode .player-bg-image { filter: blur(25px) brightness(0.3); }
+body.tiktok-mode .aesthetic-player { transform: scale(1.15); margin: 0; width: 90%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); border-color: rgba(255,255,255,0.4); }
+body.tiktok-mode .player-bg-image { filter: blur(25px) brightness(0.2); }
+body.tiktok-mode #particlesCanvas { opacity: 1; z-index: 2; }
 
 .btn-exit-tiktok { position: absolute; top: 40px; left: 20px; z-index: 100; background: rgba(255, 0, 80, 0.9); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 10px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: flex; align-items: center; box-shadow: 0 5px 15px rgba(255,0,80,0.5); cursor: pointer; }
 
@@ -196,7 +197,6 @@ body.tiktok-mode .player-bg-image { filter: blur(25px) brightness(0.3); }
 .color-option { width: 100%; aspect-ratio: 1; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: transform 0.2s; }
 .color-option.active { border-color: var(--text-primary); transform: scale(1.1); }
 
-/* MODALES */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 3000; display: flex; align-items: center; justify-content: center; }
 .modal-content { background: var(--bg-card-solid); width: 85%; max-width: 320px; border-radius: 16px; padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border-color); animation: zoomIn 0.2s ease; }
 @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
