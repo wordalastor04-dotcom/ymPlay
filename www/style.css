@@ -25,31 +25,43 @@
 
 body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-body); color: var(--text-primary); height: 100vh; height: 100dvh; display: flex; align-items: center; justify-content: center; overflow: hidden; transition: background 0.3s, color 0.3s; }
 
-/* --- BANNER --- */
 .update-banner { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); background: var(--accent-gradient); color: #fff; padding: 10px 16px; border-radius: 30px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px var(--accent-glow); z-index: 2000; transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); font-size: 13px; font-weight: 600; width: 90%; max-width: 400px; justify-content: space-between; }
 .update-banner.show { top: 20px; }
 .update-banner button { background: #fff; color: #000; border: none; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 11px; cursor: pointer; }
 .update-banner .close-update { background: transparent; color: #fff; padding: 0 5px; font-size: 16px; }
 
-/* --- FONDO GLOBAL --- */
 #custom-bg { position: fixed; inset: 0; z-index: -2; background-size: cover; background-position: center; opacity: 1; display: none; pointer-events: none; filter: blur(0px); transition: filter 0.2s ease; }
 body.has-custom-bg #custom-bg { display: block; }
 
-.player-app { width: 100%; max-width: 480px; height: 100%; background: var(--bg-card); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: flex; flex-direction: column; position: relative; overflow: hidden; }
+/* El contenedor principal ahora toma el color de fondo dinámico */
+.player-app { width: 100%; max-width: 480px; height: 100%; background: var(--bg-card); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); display: flex; flex-direction: column; position: relative; overflow: hidden; transition: background 0.5s; }
 body.has-custom-bg .player-app { background: rgba(15, 23, 42, var(--ui-transparency)); backdrop-filter: none; -webkit-backdrop-filter: none; }
 
-/* --- MENÚ LATERAL --- */
-.side-menu { position: fixed; top: 0; left: -280px; width: 260px; height: 100vh; height: 100dvh; background: var(--bg-card-solid); z-index: 1000; transition: left 0.3s; box-shadow: 2px 0 15px rgba(0,0,0,0.5); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 40px; }
+/* MENÚ LATERAL */
+.side-menu { position: fixed; top: 0; left: -280px; width: 260px; height: 100vh; height: 100dvh; background: var(--bg-card-solid); z-index: 1000; transition: left 0.3s; box-shadow: 2px 0 15px rgba(0,0,0,0.5); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 40px; transition: left 0.3s, background 0.5s; }
 .side-menu.open { left: 0; }
 .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;}
 .menu-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .menu-list li button, .menu-btn { width: 100%; padding: 12px; background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 10px; text-align: left; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
 .menu-list li button:active, .menu-btn:active { background: var(--slider-track); }
-.btn-settings { color: var(--accent) !important; font-weight: bold !important; border-color: var(--accent) !important; text-align: center !important; margin-bottom: 10px; }
+
+/* BOTÓN DE AJUSTES VISIBLE */
+.btn-settings {
+    background: var(--accent) !important;
+    color: #000 !important; /* Texto oscuro sobre el color brillante */
+    font-weight: 700 !important;
+    border: none !important;
+    text-align: center !important;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 10px var(--accent-glow);
+    border-radius: 10px;
+}
+[data-theme="light"] .btn-settings { color: #fff !important; } /* En modo claro, texto blanco */
+
 .menu-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .menu-overlay.active { opacity: 1; pointer-events: auto; }
 
-/* --- PANTALLAS GENERALES --- */
+/* PANTALLAS */
 #screen-main, #screen-player, #screen-settings { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 15px; animation: fadeIn 0.3s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -59,7 +71,6 @@ body.has-custom-bg .player-app { background: rgba(15, 23, 42, var(--ui-transpare
 .icon-btn:active { transform: scale(0.9); }
 .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
 
-/* --- BÚSQUEDA --- */
 .search-container { display: flex; align-items: center; background: var(--bg-card-solid); border: 1px solid var(--border-color); border-radius: 20px; padding: 8px 15px; margin-bottom: 12px; gap: 10px; transition: border-color 0.3s ease; }
 .search-container:focus-within { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
 .search-icon { width: 18px; height: 18px; fill: var(--text-secondary); flex-shrink: 0; }
@@ -78,7 +89,6 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 
 .add-playlist-btn { width: 100%; padding: 12px; border-radius: 10px; border: 2px dashed var(--border-color); background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
 
-/* --- MINI REPRODUCTOR --- */
 .mini-player { display: flex; align-items: center; padding: 8px 12px; background: var(--bg-card-solid); border: 1px solid var(--border-color); border-bottom: none; border-radius: 12px 12px 0 0; margin: 0 -15px; padding-bottom: calc(env(safe-area-inset-bottom) + 8px); cursor: pointer; animation: slideUp 0.3s ease; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .mini-cover { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: var(--bg-body); }
@@ -89,26 +99,12 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .mini-btn { background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 5px; }
 .mini-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
-/* ============================================================
-   REPRODUCTOR (AESTHETIC)
-============================================================ */
+/* REPRODUCTOR */
 #screen-player { position: relative; overflow: hidden; padding: 0; }
 .player-bg-image { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity 0.5s ease; filter: blur(15px) brightness(0.3); transform: scale(1.1); }
 .player-content { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; padding: 15px; padding-top: env(safe-area-inset-top); }
 
-/* DISEÑO DE CAJA */
-.aesthetic-player {
-    position: relative;
-    width: 100%;
-    background: rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 12px;
-    padding: 15px;
-    display: flex; gap: 15px;
-    backdrop-filter: blur(10px);
-    margin-top: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
+.aesthetic-player { position: relative; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 15px; display: flex; gap: 15px; backdrop-filter: blur(10px); margin-top: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 
 .tiktok-borders { position: absolute; width: 24px; height: 24px; border: 2px solid #fff; opacity: 0.6; }
 .top-left { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
@@ -137,7 +133,6 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .visualizer-container { width: 100%; height: 30px; }
 .visualizer-canvas { width: 100%; height: 100%; }
 
-/* Info debajo */
 .song-info-bottom { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 10px; z-index: 5; }
 .cover-badge { background: rgba(0,0,0,0.6); color: #fff; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; border: 1px solid rgba(255,255,255,0.1); }
 .fav-btn { background: transparent; border: none; color: #ccc; cursor: pointer; padding: 5px; }
@@ -145,7 +140,6 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .fav-btn.active { color: #ff4d4d; }
 .fav-btn.active svg { fill: #ff4d4d; stroke: #ff4d4d; }
 
-/* Barra y Controles */
 .progress-section { margin-top: 15px; margin-bottom: 15px; z-index: 5; }
 .progress-bar-wrap { position: relative; height: 6px; background: rgba(255,255,255,0.2); border-radius: 4px; cursor: pointer; }
 .progress-fill { height: 100%; width: 0%; background: var(--accent-gradient); border-radius: 4px; position: relative; box-shadow: 0 0 10px var(--accent); }
@@ -162,7 +156,6 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .mode-btn svg { width: 22px; height: 22px; fill: currentColor; }
 .mode-btn.active { color: var(--accent); background: rgba(255,255,255,0.1); filter: drop-shadow(0 0 5px var(--accent)); }
 
-/* Panel Letras / EQ */
 .bottom-panel { display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0 -15px; z-index: 5; }
 .tab-bar { display: flex; gap: 4px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-radius: 12px; padding: 4px; margin: 0 15px 10px 15px; border: 1px solid rgba(255,255,255,0.1); }
 .tab-btn { flex: 1; padding: 8px; border: none; background: transparent; color: #aaa; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; }
@@ -182,9 +175,7 @@ body[data-theme="light"] .playlist li { background: rgba(255, 255, 255, var(--ui
 .eq-band input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px var(--accent); }
 .btn-reset-eq { display: block; margin: 15px auto; padding: 8px 16px; border: 1px solid #ff4d4d; background: transparent; color: #ff4d4d; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
-/* ============================================================
-   MODO TIKTOK (MODO GRABACIÓN)
-============================================================ */
+/* MODO TIKTOK */
 body.tiktok-mode #normal-player-ui { display: flex !important; flex-direction: column; justify-content: center; height: 100%; }
 body.tiktok-mode .top-bar { display: none !important; }
 body.tiktok-mode .song-info-bottom { display: none !important; }
@@ -195,19 +186,9 @@ body.tiktok-mode .bottom-panel { display: none !important; }
 body.tiktok-mode .aesthetic-player { transform: scale(1.1); margin: 0; }
 body.tiktok-mode .player-bg-image { filter: blur(25px) brightness(0.3); }
 
-.btn-exit-tiktok {
-    position: absolute; top: 40px; left: 20px;
-    z-index: 100;
-    background: rgba(255, 0, 80, 0.9);
-    color: #fff; border: 1px solid rgba(255,255,255,0.3);
-    padding: 10px 16px; border-radius: 20px;
-    font-size: 13px; font-weight: 700;
-    display: flex; align-items: center;
-    box-shadow: 0 5px 15px rgba(255,0,80,0.5);
-    cursor: pointer;
-}
+.btn-exit-tiktok { position: absolute; top: 40px; left: 20px; z-index: 100; background: rgba(255, 0, 80, 0.9); color: #fff; border: 1px solid rgba(255,255,255,0.3); padding: 10px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: flex; align-items: center; box-shadow: 0 5px 15px rgba(255,0,80,0.5); cursor: pointer; }
 
-/* --- AJUSTES --- */
+/* AJUSTES */
 .settings-scroll { flex: 1; overflow-y: auto; padding-bottom: 20px; }
 .settings-section-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin: 20px 0 10px 5px; text-transform: uppercase; }
 .settings-group { background: var(--bg-body); border-radius: 16px; border: 1px solid var(--border-color); overflow: hidden; }
@@ -215,7 +196,7 @@ body.tiktok-mode .player-bg-image { filter: blur(25px) brightness(0.3); }
 .color-option { width: 100%; aspect-ratio: 1; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: transform 0.2s; }
 .color-option.active { border-color: var(--text-primary); transform: scale(1.1); }
 
-/* --- MODALES --- */
+/* MODALES */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 3000; display: flex; align-items: center; justify-content: center; }
 .modal-content { background: var(--bg-card-solid); width: 85%; max-width: 320px; border-radius: 16px; padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border-color); animation: zoomIn 0.2s ease; }
 @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -225,7 +206,6 @@ body.tiktok-mode .player-bg-image { filter: blur(25px) brightness(0.3); }
 .btn-secondary { padding: 8px 12px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); font-weight: 600; cursor: pointer; font-size: 13px; }
 .btn-primary { padding: 8px 12px; border-radius: 8px; border: none; background: var(--accent-gradient); color: #fff; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px var(--accent-glow); font-size: 13px; }
 
-/* --- MENÚ CONTEXTUAL --- */
 .bottom-sheet { position: fixed; bottom: -100%; left: 0; width: 100%; background: var(--bg-card-solid); border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 12px 15px 25px 15px; z-index: 4000; transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 -10px 30px rgba(0,0,0,0.5); }
 .bottom-sheet.show { bottom: 0; }
 .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
