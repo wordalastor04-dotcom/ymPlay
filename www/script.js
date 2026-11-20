@@ -16,16 +16,17 @@ let eqFilters = [];
 let isEqActive = false; 
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-// Variables para Letras y Visualizador
 let currentLyrics = [];
 let animationFrameId = null;
 const canvas = document.getElementById('audioVisualizer');
 const canvasCtx = canvas ? canvas.getContext('2d') : null;
+const canvasTikTok = document.getElementById('audioVisualizerTikTok');
+const canvasTikTokCtx = canvasTikTok ? canvasTikTok.getContext('2d') : null;
 
 let playbackMode = 'normal'; 
 
-// --- VARIABLES DE VERSIÓN Y ACTUALIZACIÓN ---
-const CURRENT_APP_VERSION = "1.3.0"; 
+// --- VARIABLES DE VERSIÓN ---
+const CURRENT_APP_VERSION = "1.4.0"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -57,14 +58,28 @@ const bgBlurSlider = $('bgBlurSlider');
 const uiOpacitySlider = $('uiOpacitySlider');
 const customBg = document.getElementById('custom-bg');
 
-// Nuevos elementos del reproductor
+// Elementos nuevos del reproductor
 const playerBg = $('player-bg');
 const playerBgInput = $('playerBgInput');
 const quickPlayerBgInput = $('quickPlayerBgInput');
+const coverInput = $('coverInput'); // Botón nueva portada
 const btnToggleLyrics = $('btnToggleLyrics');
 const btnTikTokMode = $('btnTikTokMode');
+const btnExitTikTok = $('btnExitTikTok'); // Botón salir TikTok
 const lyricsBox = $('lyricsBox');
 const coverContainer = $('coverContainer');
+const normalPlayerUI = $('normal-player-ui');
+const tiktokVisualUI = $('tiktok-visual-ui');
+
+// Elementos de la vista TikTok
+const coverImgTikTok = $('coverImgTikTok');
+const songTitleTikTok = $('songTitleTikTok');
+const currentTimeTikTok = $('currentTimeTikTok');
+const totalTimeTikTok = $('totalTimeTikTok');
+const tikTokPlayBtn = $('tikTokPlayBtn');
+const tikTokPlayIcon = $('tikTokPlayIcon');
+const tikTokPrevBtn = $('tikTokPrevBtn');
+const tikTokNextBtn = $('tikTokNextBtn');
 
 const searchInput = $('searchInput');
 const clearSearchBtn = $('clearSearchBtn');
@@ -123,7 +138,6 @@ const modalCtxPlaylists = $('modal-ctx-playlists');
 const ctxPlaylistOptions = $('ctx-playlist-options');
 const cancelCtxPlaylist = $('cancelCtxPlaylist');
 
-// Elementos Letras
 const modalLyrics = $('modal-lyrics');
 const manualLyricsInput = $('manualLyricsInput');
 const cancelLyricsBtn = $('cancelLyricsBtn');
@@ -156,28 +170,22 @@ if (clearSearchBtn) {
 }
 
 // ============================================================
-// VISUALIZADOR DE AUDIO Y WEB AUDIO API
+// VISUALIZADOR DE AUDIO
 // ============================================================
 function setupAudioContext() {
   if (sourceNode) return; 
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
     sourceNode = audioCtx.createMediaElementSource(audio);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
     
-    // Configurar Ecualizador
     eqFilters = EQ_FREQS.map(freq => { 
         const filter = audioCtx.createBiquadFilter(); 
-        filter.type = 'peaking'; 
-        filter.frequency.value = freq; 
-        filter.Q.value = 1; 
-        filter.gain.value = 0; 
+        filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0; 
         return filter; 
     });
 
-    // Conexión: Source -> EQ -> Analyser -> Destino
     let prev = sourceNode; 
     eqFilters.forEach(f => { prev.connect(f); prev = f; }); 
     prev.connect(analyser);
@@ -189,14 +197,8 @@ function setupAudioContext() {
 }
 
 function drawVisualizer() {
-    if (!canvasCtx || !analyser) return;
+    if (!analyser) return;
     
-    // Ajustar el tamaño del canvas
-    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-    }
-
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     
@@ -204,134 +206,78 @@ function drawVisualizer() {
         animationFrameId = requestAnimationFrame(draw);
         analyser.getByteFrequencyData(dataArray);
 
-        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        const barWidth = (canvas.width / bufferLength) * 2.5;
-        let x = 0;
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00d2ff';
 
-        for (let i = 0; i < bufferLength; i++) {
-            const barHeight = (dataArray[i] / 255) * canvas.height;
-            
-            // Color dinámico basado en el tema
-            const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00d2ff';
-            canvasCtx.fillStyle = accentColor;
-            
-            // Dibujar barra estilo TikTok (centrado)
-            const y = canvas.height - barHeight;
-            canvasCtx.fillRect(x, y, barWidth, barHeight);
-            x += barWidth + 1;
+        // Dibujar en el Canvas Normal
+        if (canvasCtx && canvas.clientWidth > 0) {
+            if (canvas.width !== canvas.clientWidth) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            const barWidth = (canvas.width / bufferLength) * 2.5;
+            let x = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * canvas.height;
+                canvasCtx.fillStyle = accentColor;
+                canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                x += barWidth + 1;
+            }
+        }
+
+        // Dibujar en el Canvas TikTok
+        if (canvasTikTokCtx && canvasTikTok.clientWidth > 0 && document.body.classList.contains('tiktok-mode')) {
+            if (canvasTikTok.width !== canvasTikTok.clientWidth) { canvasTikTok.width = canvasTikTok.clientWidth; canvasTikTok.height = canvasTikTok.clientHeight; }
+            canvasTikTokCtx.clearRect(0, 0, canvasTikTok.width, canvasTikTok.height);
+            const barWidthTikTok = (canvasTikTok.width / bufferLength) * 2;
+            let xTikTok = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * canvasTikTok.height;
+                // Hacerlo parecer una línea en el centro
+                const y = (canvasTikTok.height / 2) - (barHeight / 2);
+                canvasTikTokCtx.fillStyle = accentColor;
+                canvasTikTokCtx.fillRect(xTikTok, y, barWidthTikTok, barHeight);
+                xTikTok += barWidthTikTok + 1;
+            }
         }
     }
     draw();
 }
 
 // ============================================================
-// LÓGICA DE LETRAS (LRC)
+// COLOR AUTOMÁTICO Y FONDOS
 // ============================================================
-function parseLRC(lrcText) {
-    const lines = lrcText.split('\n');
-    const result = [];
-    const timeRegEx = /\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/;
-    
-    lines.forEach(line => {
-        const match = timeRegEx.exec(line);
-        if (match) {
-            const minutes = parseInt(match[1]);
-            const seconds = parseFloat(match[2]);
-            const text = match[3].trim();
-            if (text) {
-                result.push({ time: minutes * 60 + seconds, text: text });
+function extractColorFromCover(imageSrc) {
+    if (!imageSrc) return;
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = imageSrc;
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 10; canvas.height = 10;
+        ctx.drawImage(img, 0, 0, 10, 10);
+        const data = ctx.getImageData(0, 0, 10, 10).data;
+        let r=0, g=0, b=0, count=0;
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i+3] < 128) continue;
+            r += data[i]; g += data[i+1]; b += data[i+2]; count++;
+        }
+        if (count > 0) {
+            r = Math.floor(r/count); g = Math.floor(g/count); b = Math.floor(b/count);
+            const hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+            
+            // Aplicar a las variables de los anillos (siempre)
+            document.documentElement.style.setProperty('--cover-color', hex);
+            document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
+
+            // Si no hay un tema manual seleccionado, aplicar a toda la app
+            if (!localStorage.getItem('ymPlay_manualTheme')) {
+                document.documentElement.style.setProperty('--accent', hex);
+                document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+                document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${hex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
             }
         }
-    });
-    return result.sort((a, b) => a.time - b.time);
+    };
 }
 
-function loadLyricsForTrack(track) {
-    if (!lyricsBox) return;
-    const savedLyrics = localStorage.getItem(`ymPlay_lyrics_${track.url}`);
-    
-    if (savedLyrics) {
-        currentLyrics = parseLRC(savedLyrics);
-        if (currentLyrics.length > 0) {
-            lyricsBox.innerHTML = '<div style="text-align:center; opacity:0.6; padding:20px;">Letra sincronizada</div>';
-        } else {
-            lyricsBox.innerHTML = `<div style="text-align:center; padding:20px; line-height:1.8;">${savedLyrics.replace(/\n/g, '<br>')}</div>`;
-        }
-    } else {
-        currentLyrics = [];
-        lyricsBox.innerHTML = '<p style="opacity: 0.5;">No hay letras disponibles.<br><small>Toca aquí para añadir letra manual</small></p>';
-    }
-}
-
-function updateLyrics(currentTime) {
-    if (currentLyrics.length === 0) return;
-    
-    let activeLine = null;
-    for (let i = currentLyrics.length - 1; i >= 0; i--) {
-        if (currentTime >= currentLyrics[i].time) {
-            activeLine = currentLyrics[i];
-            break;
-        }
-    }
-
-    if (activeLine) {
-        // Solo actualizar si cambió la línea para no sobrecargar el DOM
-        if (lyricsBox.dataset.activeText !== activeLine.text) {
-            lyricsBox.dataset.activeText = activeLine.text;
-            lyricsBox.innerHTML = `<div class="lyric-line active" style="font-size: 18px; font-weight: bold; color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); transition: all 0.3s; transform: scale(1.05); padding: 20px;">${activeLine.text}</div>`;
-        }
-    }
-}
-
-if (lyricsBox) {
-    lyricsBox.addEventListener('click', () => {
-        if (currentIndex !== -1) {
-            const saved = localStorage.getItem(`ymPlay_lyrics_${tracks[currentIndex].url}`);
-            manualLyricsInput.value = saved || '';
-            modalLyrics.style.display = 'flex';
-        }
-    });
-}
-
-if (cancelLyricsBtn) cancelLyricsBtn.addEventListener('click', () => modalLyrics.style.display = 'none');
-
-if (saveLyricsBtn) {
-    saveLyricsBtn.addEventListener('click', () => {
-        if (currentIndex === -1) return;
-        const text = manualLyricsInput.value;
-        if (text.trim()) {
-            localStorage.setItem(`ymPlay_lyrics_${tracks[currentIndex].url}`, text);
-        } else {
-            localStorage.removeItem(`ymPlay_lyrics_${tracks[currentIndex].url}`);
-        }
-        modalLyrics.style.display = 'none';
-        loadLyricsForTrack(tracks[currentIndex]);
-    });
-}
-
-// ============================================================
-// MODOS DE VISUALIZACIÓN Y TIKTOK
-// ============================================================
-if (btnToggleLyrics) {
-    btnToggleLyrics.addEventListener('click', () => {
-        const tabBar = document.querySelector('.bottom-panel');
-        if(tabBar) tabBar.style.display = tabBar.style.display === 'none' ? 'block' : 'none';
-    });
-}
-
-if (btnTikTokMode) {
-    btnTikTokMode.addEventListener('click', () => {
-        document.body.classList.toggle('tiktok-mode');
-        const isTikTok = document.body.classList.contains('tiktok-mode');
-        btnTikTokMode.style.color = isTikTok ? '#fff' : '#ff0050';
-        btnTikTokMode.style.borderColor = isTikTok ? '#fff' : '#ff0050';
-    });
-}
-
-// ============================================================
-// FONDOS Y APARIENCIA
-// ============================================================
 function applyPlayerBackground(imageSrc) {
     if (!playerBg) return;
     if (imageSrc) {
@@ -361,31 +307,124 @@ function handlePlayerBgUpload(e) {
 if (playerBgInput) playerBgInput.addEventListener('change', handlePlayerBgUpload);
 if (quickPlayerBgInput) quickPlayerBgInput.addEventListener('change', handlePlayerBgUpload);
 
-// Extraer color de la portada para efectos de luz
-function extractColorFromCover(imageSrc) {
-    if (!imageSrc) return;
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.src = imageSrc;
-    img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 10; canvas.height = 10;
-        ctx.drawImage(img, 0, 0, 10, 10);
-        const data = ctx.getImageData(0, 0, 10, 10).data;
-        let r=0, g=0, b=0, count=0;
-        for (let i = 0; i < data.length; i += 4) {
-            if (data[i+3] < 128) continue;
-            r += data[i]; g += data[i+1]; b += data[i+2]; count++;
+// Cambiar Portada de la Canción
+if (coverInput) {
+    coverInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && currentIndex !== -1) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target.result;
+                tracks[currentIndex].cover = base64;
+                saveTracksCache();
+                
+                // Actualizar UI
+                if(coverImg) { coverImg.src = base64; coverImg.style.display = 'block'; }
+                if(coverImgTikTok) coverImgTikTok.src = base64;
+                if(miniCover) miniCover.src = base64;
+                extractColorFromCover(base64);
+            };
+            reader.readAsDataURL(file);
         }
-        if (count > 0) {
-            r = Math.floor(r/count); g = Math.floor(g/count); b = Math.floor(b/count);
-            const hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-            // Aplicar color de glow a los anillos
-            document.documentElement.style.setProperty('--cover-color', hex);
-            document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
+    });
+}
+
+// ============================================================
+// LÓGICA DE LETRAS (LRC)
+// ============================================================
+function parseLRC(lrcText) {
+    const lines = lrcText.split('\n');
+    const result = [];
+    const timeRegEx = /\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/;
+    lines.forEach(line => {
+        const match = timeRegEx.exec(line);
+        if (match) {
+            const minutes = parseInt(match[1]);
+            const seconds = parseFloat(match[2]);
+            const text = match[3].trim();
+            if (text) result.push({ time: minutes * 60 + seconds, text: text });
         }
-    };
+    });
+    return result.sort((a, b) => a.time - b.time);
+}
+
+function loadLyricsForTrack(track) {
+    if (!lyricsBox) return;
+    const savedLyrics = localStorage.getItem(`ymPlay_lyrics_${track.url}`);
+    if (savedLyrics) {
+        currentLyrics = parseLRC(savedLyrics);
+        if (currentLyrics.length > 0) {
+            lyricsBox.innerHTML = '<div style="text-align:center; opacity:0.6; padding:20px;">Letra sincronizada</div>';
+        } else {
+            lyricsBox.innerHTML = `<div style="text-align:center; padding:20px; line-height:1.8;">${savedLyrics.replace(/\n/g, '<br>')}</div>`;
+        }
+    } else {
+        currentLyrics = [];
+        lyricsBox.innerHTML = '<p style="opacity: 0.5;">No hay letras disponibles.<br><small>Toca aquí para añadir letra manual</small></p>';
+    }
+}
+
+function updateLyrics(currentTime) {
+    if (currentLyrics.length === 0) return;
+    let activeLine = null;
+    for (let i = currentLyrics.length - 1; i >= 0; i--) {
+        if (currentTime >= currentLyrics[i].time) { activeLine = currentLyrics[i]; break; }
+    }
+    if (activeLine && lyricsBox && lyricsBox.dataset.activeText !== activeLine.text) {
+        lyricsBox.dataset.activeText = activeLine.text;
+        lyricsBox.innerHTML = `<div class="lyric-line active" style="font-size: 18px; font-weight: bold; color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); transition: all 0.3s; transform: scale(1.05); padding: 20px;">${activeLine.text}</div>`;
+    }
+}
+
+if (lyricsBox) {
+    lyricsBox.addEventListener('click', () => {
+        if (currentIndex !== -1) {
+            const saved = localStorage.getItem(`ymPlay_lyrics_${tracks[currentIndex].url}`);
+            manualLyricsInput.value = saved || '';
+            modalLyrics.style.display = 'flex';
+        }
+    });
+}
+if (cancelLyricsBtn) cancelLyricsBtn.addEventListener('click', () => modalLyrics.style.display = 'none');
+if (saveLyricsBtn) {
+    saveLyricsBtn.addEventListener('click', () => {
+        if (currentIndex === -1) return;
+        const text = manualLyricsInput.value;
+        if (text.trim()) localStorage.setItem(`ymPlay_lyrics_${tracks[currentIndex].url}`, text);
+        else localStorage.removeItem(`ymPlay_lyrics_${tracks[currentIndex].url}`);
+        modalLyrics.style.display = 'none';
+        loadLyricsForTrack(tracks[currentIndex]);
+    });
+}
+
+// ============================================================
+// MODO TIKTOK
+// ============================================================
+if (btnTikTokMode) {
+    btnTikTokMode.addEventListener('click', () => {
+        document.body.classList.add('tiktok-mode');
+        if(normalPlayerUI) normalPlayerUI.style.display = 'none';
+        if(tiktokVisualUI) tiktokVisualUI.style.display = 'flex';
+        if(btnExitTikTok) btnExitTikTok.style.display = 'flex';
+        setTimeout(() => { if(canvasTikTok) { canvasTikTok.width = canvasTikTok.clientWidth; canvasTikTok.height = canvasTikTok.clientHeight; } }, 100);
+    });
+}
+
+if (btnExitTikTok) {
+    btnExitTikTok.addEventListener('click', () => {
+        document.body.classList.remove('tiktok-mode');
+        if(normalPlayerUI) normalPlayerUI.style.display = 'flex';
+        if(tiktokVisualUI) tiktokVisualUI.style.display = 'none';
+        if(btnExitTikTok) btnExitTikTok.style.display = 'none';
+        setTimeout(() => { if(canvas) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; } }, 100);
+    });
+}
+
+if (btnToggleLyrics) {
+    btnToggleLyrics.addEventListener('click', () => {
+        const tabBar = document.querySelector('.bottom-panel');
+        if(tabBar) tabBar.style.display = tabBar.style.display === 'none' ? 'block' : 'none';
+    });
 }
 
 // ============================================================
@@ -407,6 +446,7 @@ function cargarCancion(index, startTime = 0) {
     audio.addEventListener('loadedmetadata', function onMetadata() { audio.currentTime = startTime; audio.removeEventListener('loadedmetadata', onMetadata); });
   }
 
+  // Actualizar UI Normal
   if(songTitle) songTitle.textContent = track.name;
   if(songArtist) songArtist.textContent = track.artist;
   if (coverBadge) coverBadge.textContent = `Pista ${index + 1} de ${tracks.length}`;
@@ -415,12 +455,22 @@ function cargarCancion(index, startTime = 0) {
   else favBtn.classList.remove('active');
 
   let coverUrl = '';
-  if (track.cover && coverImg) {
+  if (track.cover) {
     coverUrl = window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(track.cover) : track.cover;
-    coverImg.src = coverUrl; coverImg.style.display = 'block';
+    if(coverImg) { coverImg.src = coverUrl; coverImg.style.display = 'block'; }
     extractColorFromCover(coverUrl);
-  } else if (coverImg) { coverImg.style.display = 'none'; }
+  } else if (coverImg) { 
+      coverImg.style.display = 'none'; 
+  }
 
+  // Actualizar UI TikTok
+  if(songTitleTikTok) songTitleTikTok.textContent = track.name;
+  if(coverImgTikTok) {
+      if(coverUrl) coverImgTikTok.src = coverUrl;
+      else coverImgTikTok.src = ''; // O una imagen por defecto
+  }
+
+  // Actualizar Mini Player
   if (miniPlayer) {
     miniPlayer.style.display = 'flex'; 
     miniTitle.textContent = track.name;
@@ -439,10 +489,7 @@ function cargarCancion(index, startTime = 0) {
   playAudio();
 }
 
-function playAudio() { 
-    if (currentIndex === -1) return; 
-    audio.play().catch(err => console.warn('Error:', err)); 
-}
+function playAudio() { if (currentIndex === -1) return; audio.play().catch(err => console.warn('Error:', err)); }
 function togglePlay() { if (audio.paused) playAudio(); else audio.pause(); }
 
 function getActiveQueue() {
@@ -461,19 +508,13 @@ function prevTrack() {
 
 function nextTrack() { 
   const queue = getActiveQueue(); if (queue.length === 0) return;
-  
   if (playbackMode === 'shuffle') {
     let randomIndex = Math.floor(Math.random() * queue.length);
-    if (queue.length > 1) {
-        while (queue[randomIndex].url === tracks[currentIndex]?.url) {
-            randomIndex = Math.floor(Math.random() * queue.length);
-        }
-    }
+    if (queue.length > 1) { while (queue[randomIndex].url === tracks[currentIndex]?.url) randomIndex = Math.floor(Math.random() * queue.length); }
     const realIndex = tracks.findIndex(t => t.url === queue[randomIndex].url);
     if (realIndex !== -1) cargarCancion(realIndex);
     return;
   }
-
   const currentUrl = tracks[currentIndex]?.url; let qIndex = queue.findIndex(t => t.url === currentUrl);
   if (qIndex === -1) qIndex = -1; 
   const nextQIndex = (qIndex + 1) % queue.length;
@@ -496,20 +537,35 @@ function setupMediaSession(track, coverUrl) {
   }
 }
 
+// SINCRONIZACIÓN DE TIEMPO Y BOTONES
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
-  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
-  if(currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
+  const timeStr = formatTime(audio.currentTime);
+  const totalStr = formatTime(audio.duration);
   
-  // Actualizar Letras
+  if(progressFill) progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
+  if(currentTimeEl) currentTimeEl.textContent = timeStr;
+  if(totalTimeEl) totalTimeEl.textContent = totalStr;
+  if(currentTimeTikTok) currentTimeTikTok.textContent = timeStr;
+  if(totalTimeTikTok) totalTimeTikTok.textContent = totalStr;
+  
   updateLyrics(audio.currentTime);
 });
 
+audio.addEventListener('loadedmetadata', () => {
+    const totalStr = formatTime(audio.duration);
+    if(totalTimeEl) totalTimeEl.textContent = totalStr;
+    if(totalTimeTikTok) totalTimeTikTok.textContent = totalStr;
+});
+
 audio.addEventListener('play', () => { 
-  if(playIcon) playIcon.innerHTML = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>'; 
-  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+  const pauseIcon = '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>';
+  if(playIcon) playIcon.innerHTML = pauseIcon; 
+  if(miniPlayBtn) miniPlayBtn.innerHTML = `<svg viewBox="0 0 24 24">${pauseIcon}</svg>`;
+  if(tikTokPlayIcon) tikTokPlayIcon.innerHTML = pauseIcon;
+  
   requestWakeLock(); 
-  setupAudioContext(); // Siempre iniciar contexto al dar play
+  setupAudioContext(); 
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   
   if(coverContainer) coverContainer.classList.add('is-playing');
@@ -517,8 +573,11 @@ audio.addEventListener('play', () => {
 });
 
 audio.addEventListener('pause', () => { 
-  if(playIcon) playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
-  if(miniPlayBtn) miniPlayBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  const playIconSVG = '<path d="M8 5v14l11-7z"/>';
+  if(playIcon) playIcon.innerHTML = playIconSVG; 
+  if(miniPlayBtn) miniPlayBtn.innerHTML = `<svg viewBox="0 0 24 24">${playIconSVG}</svg>`;
+  if(tikTokPlayIcon) tikTokPlayIcon.innerHTML = playIconSVG;
+  
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   if(coverContainer) coverContainer.classList.remove('is-playing');
   releaseWakeLock(); 
@@ -530,49 +589,15 @@ audio.addEventListener('ended', () => {
 });
 
 // ============================================================
-// ECUALIZADOR (Modificado para usar el nuevo AudioContext)
-// ============================================================
-document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
-  slider.addEventListener('input', () => { 
-    setupAudioContext(); 
-    if (eqFilters[i]) eqFilters[i].gain.value = parseFloat(slider.value); 
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); 
-  });
-});
-
-document.getElementById('eqPresets')?.addEventListener('click', e => {
-  setupAudioContext();
-  const btn = e.target.closest('.preset-btn'); if (!btn) return;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active');
-  const gains = { flat: [0,0,0,0,0], rock: [5,3,-1,3,5], pop: [-1,2,4,2,-1], jazz: [3,1,-2,1,3], vocal: [-2,0,4,3,-1] }[btn.dataset.preset] || [0,0,0,0,0];
-  document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => { slider.value = gains[i]; if (eqFilters[i]) eqFilters[i].gain.value = gains[i]; });
-});
-
-document.getElementById('eqResetBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('#eqSliders input[type="range"]').forEach((slider, i) => {
-        slider.value = 0;
-        if (eqFilters[i]) eqFilters[i].gain.value = 0;
-    });
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.preset-btn[data-preset="flat"]').classList.add('active');
-});
-
-// ============================================================
 // FUNCIONES RESTANTES (Escaneo, Playlists, Eventos UI, etc.)
 // ============================================================
 async function iniciarServicioSegundoPlano() {
     const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
-    if (ForegroundService) {
-        try {
-            await ForegroundService.startForegroundService({ id: 1, title: "ymPlay", body: "Reproduciendo música..." });
-        } catch (e) {}
-    }
+    if (ForegroundService) { try { await ForegroundService.startForegroundService({ id: 1, title: "ymPlay", body: "Reproduciendo música..." }); } catch (e) {} }
 }
 async function detenerServicioSegundoPlano() {
     const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
-    if (ForegroundService) {
-        try { await ForegroundService.stopForegroundService(); } catch (e) {}
-    }
+    if (ForegroundService) { try { await ForegroundService.stopForegroundService(); } catch (e) {} }
 }
 async function requestWakeLock() {
   try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
@@ -656,13 +681,10 @@ function renderPlaylist() {
   if (currentSearchQuery) displayTracks = displayTracks.filter(t => t.name.toLowerCase().includes(currentSearchQuery) || (t.artist && t.artist.toLowerCase().includes(currentSearchQuery)));
 
   const tc = $('trackCount'); if (tc) tc.textContent = `${displayTracks.length} pistas`;
-  
-  if (displayTracks.length === 0) { 
-      playlistEl.innerHTML = `<li style="justify-content:center;color:var(--text-secondary);">No hay música ${currentSearchQuery ? 'que coincida' : ''}.</li>`; return; 
-  }
+  if (displayTracks.length === 0) { playlistEl.innerHTML = `<li style="justify-content:center;color:var(--text-secondary);">No hay música.</li>`; return; }
 
   playlistEl.innerHTML = displayTracks.map((t) => {
-    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
+    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : t.cover;
     const realIndex = tracks.findIndex(x => x.url === t.url);
     return `<li data-index="${realIndex}" class="${realIndex === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name} ${t.isFavorite ? '❤️' : ''}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
   }).join('');
@@ -685,7 +707,6 @@ async function escanearMusicaNativa() {
   const MediaStorePlugin = window.Capacitor?.Plugins?.CapacitorMediaStore;
   if (!window.Capacitor || !MediaStorePlugin) return;
   try {
-    if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Buscando...</li>'; }
     await MediaStorePlugin.requestPermissions({ types: ['audio'] });
     const result = await MediaStorePlugin.getMediasByType({ mediaType: 'audio', sortBy: 'TITLE', includeExternal: true });
     const listaAudios = result.media || result.medias || [];
@@ -701,20 +722,28 @@ async function escanearMusicaNativa() {
         const duracionSegundos = t.duration > 1000 ? t.duration / 1000 : t.duration;
         if (duracionSegundos > 0 && duracionSegundos < 60) return false; 
         const urlMinuscula = t.url.toLowerCase();
-        const carpetasBasura = ['/whatsapp/', '/telegram/', '/android/media/com.whatsapp/', '/android/media/org.telegram.messenger/', '/notifications/', '/ringtones/', '/alarms/', '/ui/' ];
+        const carpetasBasura = ['/whatsapp/', '/telegram/', '/notifications/', '/ringtones/', '/alarms/'];
         if (carpetasBasura.some(carpeta => urlMinuscula.includes(carpeta))) return false;
-        const nombreMinuscula = t.name.toLowerCase();
-        if (nombreMinuscula.startsWith('ptt-') || nombreMinuscula.includes('whatsapp audio')) return false;
         return true;
       });
 
       if (newTracks.length > 0) {
+        const existingCovers = {};
+        tracks.forEach(t => { if(t.cover) existingCovers[t.url] = t.cover; });
+        
         const hiddenUrls = tracks.filter(t => t.hidden).map(t => t.url);
         const favUrls = tracks.filter(t => t.isFavorite).map(t => t.url);
-        tracks = newTracks.map(t => ({ ...t, hidden: hiddenUrls.includes(t.url), isFavorite: favUrls.includes(t.url) }));
+        
+        tracks = newTracks.map(t => ({ 
+            ...t, 
+            cover: existingCovers[t.url] || t.cover, // Mantiene la portada personalizada
+            hidden: hiddenUrls.includes(t.url), 
+            isFavorite: favUrls.includes(t.url) 
+        }));
+        
         saveTracksCache(); sortTracks('newest'); restaurarSesion();
-      } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; }
-    } else if (tracks.length === 0) { if (playlistEl) playlistEl.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">No se encontró música.</li>'; }
+      }
+    }
   } catch (error) {}
 }
 
@@ -742,14 +771,13 @@ function renderPlaylistsList() {
 }
 
 function renderPlaylistDetail() {
-  const pl = playlists.find(p => p.id === currentPlaylistId);
-  if (!pl) return;
+  const pl = playlists.find(p => p.id === currentPlaylistId); if (!pl) return;
   let songsInPlaylist = tracks.filter(t => pl.songs.includes(t.url) && !t.hidden);
   if (currentSearchQuery) songsInPlaylist = songsInPlaylist.filter(t => t.name.toLowerCase().includes(currentSearchQuery) || (t.artist && t.artist.toLowerCase().includes(currentSearchQuery)));
   if (songsInPlaylist.length === 0) { playlistDetailList.innerHTML = '<li style="justify-content:center;color:var(--text-secondary);">Playlist vacía.</li>'; return; }
   
   playlistDetailList.innerHTML = songsInPlaylist.map((t) => {
-    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
+    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : t.cover;
     const realIndex = tracks.findIndex(x => x.url === t.url);
     return `<li data-index="${realIndex}" class="${realIndex === currentIndex ? 'active' : ''}"><div style="display:flex; align-items:center; gap:12px; width: 100%;">${displayCover ? `<img src="${displayCover}" style="width:45px;height:45px;border-radius:8px;object-fit:cover;">` : '<div style="width:45px;height:45px;background:var(--bg-card-solid);border-radius:8px;display:flex;align-items:center;justify-content:center;">🎵</div>'}<div style="display:flex; flex-direction:column; overflow: hidden; text-align: left;"><span style="font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.name}</span><span class="pl-artist" style="font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.artist}</span></div></div></li>`;
   }).join('');
@@ -757,8 +785,7 @@ function renderPlaylistDetail() {
 }
 
 function renderHiddenSongs() {
-    const hiddenList = $('hidden-songs-list');
-    if (!hiddenList) return;
+    const hiddenList = $('hidden-songs-list'); if (!hiddenList) return;
     const hiddenTracks = tracks.filter(t => t.hidden);
     if (hiddenTracks.length === 0) { hiddenList.innerHTML = '<li style="justify-content:center;color:var(--text-secondary); font-size: 13px;">No hay canciones ocultas.</li>'; return; }
     hiddenList.innerHTML = hiddenTracks.map(t => `<li style="display:flex; justify-content:space-between; align-items:center;"><span style="font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">${t.name}</span><button class="btn-secondary" style="color:var(--accent); padding:4px 8px;" onclick="restaurarCancion('${t.url}')">Restaurar</button></li>`).join('');
@@ -784,6 +811,7 @@ document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn
         const r = parseInt(colorHex.slice(1,3), 16); const g = parseInt(colorHex.slice(3,5), 16); const b = parseInt(colorHex.slice(5,7), 16);
         document.documentElement.style.setProperty('--accent', colorHex);
         document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
         localStorage.setItem('ymPlay_manualTheme', colorHex);
     });
 });
@@ -796,7 +824,21 @@ if($('customColorPicker')) {
         const r = parseInt(colorHex.slice(1,3), 16); const g = parseInt(colorHex.slice(3,5), 16); const b = parseInt(colorHex.slice(5,7), 16);
         document.documentElement.style.setProperty('--accent', colorHex);
         document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
         localStorage.setItem('ymPlay_manualTheme', colorHex);
+    });
+}
+if($('btnAutoColor')) {
+    $('btnAutoColor').addEventListener('click', () => {
+        localStorage.removeItem('ymPlay_manualTheme');
+        document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
+        document.querySelector('.custom-color-picker').style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
+        if (currentIndex !== -1 && tracks[currentIndex] && tracks[currentIndex].cover) {
+            extractColorFromCover(tracks[currentIndex].cover);
+        } else {
+            document.documentElement.style.setProperty('--accent', "#00d2ff");
+            document.documentElement.style.setProperty('--accent-glow', "rgba(0, 210, 255, 0.4)");
+        }
     });
 }
 
@@ -815,7 +857,7 @@ if(btnAddSongsToPlaylist) btnAddSongsToPlaylist.addEventListener('click', () => 
     const isAdded = pl.songs.includes(t.url);
     const li = document.createElement('li');
     li.style.display = 'flex'; li.style.justifyContent = 'space-between'; li.style.alignItems = 'center';
-    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : '';
+    let displayCover = t.cover && window.Capacitor?.convertFileSrc ? window.Capacitor.convertFileSrc(t.cover) : t.cover;
     const imgHtml = displayCover ? `<img src="${displayCover}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">` : `<div style="width:40px;height:40px;background:var(--bg-card-solid);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;">🎵</div>`;
     li.innerHTML = `<div style="display:flex; align-items:center; gap:10px; flex:1; overflow:hidden;">${imgHtml}<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:500;">${t.name}</span></div><span style="font-size:20px; padding-left: 10px; color:${isAdded ? 'var(--accent)' : 'var(--text-secondary)'}">${isAdded ? '✓' : '+'}</span>`;
     li.addEventListener('click', () => {
@@ -877,7 +919,7 @@ function volverALista() {
   if (currentPlaylistId !== null) { viewSongs.style.display = 'none'; viewPlaylists.style.display = 'none'; viewPlaylistDetail.style.display = 'flex'; mainTabs.style.display = 'none'; renderPlaylistDetail(); } 
   else { showView(currentTab || 'songs'); }
 }
-function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; }
+function resetProgress() { if(progressFill) progressFill.style.width = '0%'; if(currentTimeEl) currentTimeEl.textContent = '0:00'; if(currentTimeTikTok) currentTimeTikTok.textContent = '0:00'; }
 function formatTime(sec) { if (isNaN(sec) || !isFinite(sec)) return '0:00'; return `${Math.floor(sec/60)}:${Math.floor(sec%60).toString().padStart(2, '0')}`; }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -886,6 +928,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 if(playBtn) playBtn.addEventListener('click', togglePlay);
 if(prevBtn) prevBtn.addEventListener('click', prevTrack);
 if(nextBtn) nextBtn.addEventListener('click', nextTrack);
+if(tikTokPlayBtn) tikTokPlayBtn.addEventListener('click', togglePlay);
+if(tikTokPrevBtn) tikTokPrevBtn.addEventListener('click', prevTrack);
+if(tikTokNextBtn) tikTokNextBtn.addEventListener('click', nextTrack);
+
 if(backToListBtn) backToListBtn.addEventListener('click', volverALista);
 if(menuBtn) menuBtn.addEventListener('click', openMenu);
 if(closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
@@ -918,6 +964,7 @@ function setupBackButton() {
   const App = window.Capacitor?.Plugins?.App;
   if (App) {
     App.addListener('backButton', () => {
+      if (document.body.classList.contains('tiktok-mode')) { if(btnExitTikTok) btnExitTikTok.click(); return; }
       if (sideMenu && sideMenu.classList.contains('open')) { closeMenu(); return; }
       if (selectionMenu && selectionMenu.classList.contains('show')) { hideSelectionMenu(); return; }
       if (modalSelectSongs.style.display === 'flex' || modalNewPlaylist.style.display === 'flex' || modalCtxPlaylists.style.display === 'flex' || modalLyrics.style.display === 'flex') {
@@ -981,7 +1028,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (savedBg) { 
       if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
       applyBackground(savedBg, savedBlur); 
-      if (!savedThemeColor) extraerColorDominante(savedBg);
   } else {
       applyBackground('default-bg.jpg', 0);
   }
