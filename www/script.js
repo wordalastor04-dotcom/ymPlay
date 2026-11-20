@@ -9,14 +9,12 @@ let currentPlaylistId = null;
 let currentTab = 'songs'; 
 let currentSearchQuery = ''; 
 
-// Variables de Audio (Singleton)
 let audioCtx = null;
 let sourceNode = null;
 let analyser = null;
 let eqFilters = [];
 const EQ_FREQS = [60, 250, 1000, 4000, 14000];
 
-// Variables de Letras y Visualizador
 let currentLyrics = [];
 let animationFrameId = null;
 const canvas = document.getElementById('audioVisualizer');
@@ -24,7 +22,7 @@ const canvasCtx = canvas ? canvas.getContext('2d') : null;
 
 let playbackMode = 'normal'; 
 
-const CURRENT_APP_VERSION = "1.5.0"; 
+const CURRENT_APP_VERSION = "1.6.0"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -131,7 +129,7 @@ let pressTimer;
 let wakeLock = null;
 
 // ============================================================
-// UTILIDADES: COMPRESIÓN DE IMÁGENES (Para que no falle localStorage)
+// UTILIDADES Y COLORES
 // ============================================================
 function resizeImage(file, maxWidth, callback) {
     const reader = new FileReader();
@@ -144,22 +142,14 @@ function resizeImage(file, maxWidth, callback) {
             canvas.height = img.height * scaleSize;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            callback(canvas.toDataURL('image/jpeg', 0.7)); // 0.7 calidad es suficiente y pesa poco
+            callback(canvas.toDataURL('image/jpeg', 0.7)); 
         };
         img.src = e.target.result;
     };
     reader.readAsDataURL(file);
 }
 
-// ============================================================
-// COLORES Y FONDOS
-// ============================================================
-function aplicarColorTema(hex, r, g, b) {
-    document.documentElement.style.setProperty('--accent', hex);
-    document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
-    document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${hex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
-}
-
+// AQUI ESTÁ LA MAGIA DEL COLOR TIPO LARK PLAYER
 function extraerColorDominante(imageSrc, isCover = false) {
     if (!imageSrc) return;
     const img = new Image();
@@ -171,44 +161,54 @@ function extraerColorDominante(imageSrc, isCover = false) {
         canvas.width = 10; canvas.height = 10;
         ctx.drawImage(img, 0, 0, 10, 10);
         const data = ctx.getImageData(0, 0, 10, 10).data;
+        
         let r=0, g=0, b=0, count=0;
         for (let i = 0; i < data.length; i += 4) {
             if (data[i+3] < 128) continue;
             r += data[i]; g += data[i+1]; b += data[i+2]; count++;
         }
+        
         if (count > 0) {
             r = Math.floor(r/count); g = Math.floor(g/count); b = Math.floor(b/count);
-            const hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
             
-            if (isCover) {
-                document.documentElement.style.setProperty('--cover-color', hex);
-                document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
-            }
+            // 1. Color del Acento (el que brilla)
+            const accentHex = `rgb(${r}, ${g}, ${b})`;
+            document.documentElement.style.setProperty('--accent', accentHex);
+            document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+            document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, rgb(${r},${g},${b}) 0%, rgba(${r},${g},${b},0.6) 100%)`);
 
-            // Si no hay color manual, aplicar automático
-            if (!localStorage.getItem('ymPlay_manualTheme')) {
-                aplicarColorTema(hex, r, g, b);
+            // 2. Color de FONDO OSCURO (El efecto Lark Player)
+            // Multiplicamos por 0.15 para que sea muy oscuro y no lastime la vista
+            const darkR = Math.floor(r * 0.15);
+            const darkG = Math.floor(g * 0.15);
+            const darkB = Math.floor(b * 0.15);
+            const bgHex = `rgb(${darkR}, ${darkG}, ${darkB})`;
+            
+            // Aplicamos a los menús y fondos
+            document.documentElement.style.setProperty('--bg-body', bgHex);
+            document.documentElement.style.setProperty('--bg-card', `rgba(${darkR}, ${darkG}, ${darkB}, 0.85)`);
+            document.documentElement.style.setProperty('--bg-card-solid', `rgb(${Math.floor(darkR*0.9)}, ${Math.floor(darkG*0.9)}, ${Math.floor(darkB*0.9)})`);
+
+            // Si es portada, actualizamos los anillos también
+            if (isCover) {
+                document.documentElement.style.setProperty('--cover-color', accentHex);
+                document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
             }
         }
     };
 }
 
-// ============================================================
-// AUDIO CONTEXT Y ECUALIZADOR (Singleton Fix)
-// ============================================================
 function initAudioContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         sourceNode = audioCtx.createMediaElementSource(audio);
         
-        // Crear Filtros
         eqFilters = EQ_FREQS.map(freq => { 
             const filter = audioCtx.createBiquadFilter(); 
             filter.type = 'peaking'; filter.frequency.value = freq; filter.Q.value = 1; filter.gain.value = 0; 
             return filter; 
         });
 
-        // Conectar cadena
         let prev = sourceNode; 
         eqFilters.forEach(f => { prev.connect(f); prev = f; }); 
         
@@ -273,9 +273,7 @@ document.getElementById('eqResetBtn')?.addEventListener('click', () => {
     document.querySelector('.preset-btn[data-preset="flat"]').classList.add('active');
 });
 
-// ============================================================
-// SUBIDA DE IMÁGENES (Con compresión)
-// ============================================================
+// Subida de imágenes
 if (bgInput) {
     bgInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -285,7 +283,7 @@ if (bgInput) {
                     localStorage.setItem('ymPlay_customBg', base64);
                     customBg.style.backgroundImage = `url(${base64})`;
                     document.body.classList.add('has-custom-bg');
-                    extraerColorDominante(base64); // Cambia el color automáticamente
+                    extraerColorDominante(base64); // Cambia el color del menú aquí
                 } catch (err) { alert("Imagen demasiado grande, intenta con otra."); }
             });
         }
@@ -300,6 +298,7 @@ if (quickPlayerBgInput) {
                 try {
                     localStorage.setItem('ymPlay_playerBg', base64);
                     if(playerBg) { playerBg.style.backgroundImage = `url(${base64})`; playerBg.style.opacity = '1'; }
+                    extraerColorDominante(base64); // El fondo del reproductor también cambia el menú
                 } catch (err) { alert("Imagen demasiado grande, intenta con otra."); }
             });
         }
@@ -322,9 +321,7 @@ if (coverInput) {
     });
 }
 
-// ============================================================
-// LETRAS (LRC)
-// ============================================================
+// Letras (LRC)
 function parseLRC(lrcText) {
     const lines = lrcText.split('\n');
     const result = [];
@@ -390,9 +387,7 @@ if (saveLyricsBtn) {
     });
 }
 
-// ============================================================
-// MODO TIKTOK
-// ============================================================
+// Modo TikTok
 if (btnTikTokMode) {
     btnTikTokMode.addEventListener('click', () => {
         document.body.classList.add('tiktok-mode');
@@ -414,9 +409,6 @@ if (btnToggleLyrics) {
     });
 }
 
-// ============================================================
-// REPRODUCTOR Y LÓGICA
-// ============================================================
 function cargarCancion(index, startTime = 0) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
@@ -555,9 +547,6 @@ audio.addEventListener('ended', () => {
     else { nextTrack(); }
 });
 
-// ============================================================
-// SISTEMA Y UTILIDADES
-// ============================================================
 async function iniciarServicioSegundoPlano() {
     const ForegroundService = window.Capacitor?.Plugins?.ForegroundService;
     if (ForegroundService) { try { await ForegroundService.startForegroundService({ id: 1, title: "ymPlay", body: "Reproduciendo música..." }); } catch (e) {} }
@@ -772,7 +761,9 @@ document.querySelectorAll('.color-option:not(.custom-color-picker)').forEach(btn
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
         btn.classList.add('active');
         const r = parseInt(colorHex.slice(1,3), 16); const g = parseInt(colorHex.slice(3,5), 16); const b = parseInt(colorHex.slice(5,7), 16);
-        aplicarColorTema(colorHex, r, g, b);
+        document.documentElement.style.setProperty('--accent', colorHex);
+        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
         localStorage.setItem('ymPlay_manualTheme', colorHex);
     });
 });
@@ -783,7 +774,9 @@ if($('customColorPicker')) {
         document.querySelector('.custom-color-picker').style.background = colorHex;
         document.querySelector('.custom-color-picker').classList.add('active');
         const r = parseInt(colorHex.slice(1,3), 16); const g = parseInt(colorHex.slice(3,5), 16); const b = parseInt(colorHex.slice(5,7), 16);
-        aplicarColorTema(colorHex, r, g, b);
+        document.documentElement.style.setProperty('--accent', colorHex);
+        document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
+        document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, ${colorHex} 0%, rgba(${r}, ${g}, ${b}, 0.6) 100%)`);
         localStorage.setItem('ymPlay_manualTheme', colorHex);
     });
 }
@@ -792,12 +785,17 @@ if($('btnAutoColor')) {
         localStorage.removeItem('ymPlay_manualTheme');
         document.querySelectorAll('.color-option').forEach(d => d.classList.remove('active'));
         document.querySelector('.custom-color-picker').style.background = 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
-        if (currentIndex !== -1 && tracks[currentIndex] && tracks[currentIndex].cover) {
-            extraerColorDominante(tracks[currentIndex].cover, true);
-        } else if (localStorage.getItem('ymPlay_customBg')) {
+        if (localStorage.getItem('ymPlay_customBg')) {
             extraerColorDominante(localStorage.getItem('ymPlay_customBg'));
+        } else if (currentIndex !== -1 && tracks[currentIndex] && tracks[currentIndex].cover) {
+            extraerColorDominante(tracks[currentIndex].cover, true);
         } else {
-            aplicarColorTema("#00d2ff", 0, 210, 255);
+            // Colores por defecto
+            document.documentElement.style.setProperty('--accent', "#00d2ff");
+            document.documentElement.style.setProperty('--accent-glow', "rgba(0, 210, 255, 0.4)");
+            document.documentElement.style.setProperty('--bg-body', '#0b0f19');
+            document.documentElement.style.setProperty('--bg-card', 'rgba(22, 30, 46, 0.85)');
+            document.documentElement.style.setProperty('--bg-card-solid', '#161e2e');
         }
     });
 }
@@ -973,7 +971,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedThemeColor = localStorage.getItem('ymPlay_manualTheme');
   if (savedThemeColor) {
       const r = parseInt(savedThemeColor.slice(1,3), 16); const g = parseInt(savedThemeColor.slice(3,5), 16); const b = parseInt(savedThemeColor.slice(5,7), 16);
-      aplicarColorTema(savedThemeColor, r, g, b);
+      document.documentElement.style.setProperty('--accent', savedThemeColor);
+      document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
       const matchBtn = document.querySelector(`.color-option[data-color="${savedThemeColor}"]`);
       if (matchBtn) matchBtn.classList.add('active');
       else { const customBtn = document.querySelector('.custom-color-picker'); if(customBtn) { customBtn.style.background = savedThemeColor; customBtn.classList.add('active'); } }
@@ -986,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
       customBg.style.backgroundImage = `url(${savedBg})`;
       document.body.classList.add('has-custom-bg');
       customBg.style.filter = `blur(${savedBlur}px)`;
-      if (!savedThemeColor) extraerColorDominante(savedBg); // Extrae el color del fondo si no hay color manual
+      extraerColorDominante(savedBg); // ESTO HACE QUE EL MENÚ CAMBIE AL COLOR DEL FONDO AL ABRIR
   }
   
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
