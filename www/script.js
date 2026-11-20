@@ -20,9 +20,16 @@ let animationFrameId = null;
 const canvas = document.getElementById('audioVisualizer');
 const canvasCtx = canvas ? canvas.getContext('2d') : null;
 
+// VARIABLES PARA LOS PÉTALOS
+const particlesCanvas = document.getElementById('particlesCanvas');
+const particlesCtx = particlesCanvas ? particlesCanvas.getContext('2d') : null;
+let particles = [];
+const petalImg = new Image();
+petalImg.src = 'petal.png'; 
+
 let playbackMode = 'normal'; 
 
-const CURRENT_APP_VERSION = "1.6.0"; 
+const CURRENT_APP_VERSION = "1.7.1"; 
 const UPDATE_JSON_URL = "https://wordalastor04-dotcom.github.io/ymPlay/version.json";
 const UPDATE_DOWNLOAD_URL = "https://github.com/wordalastor04-dotcom/ymPlay/releases/latest";
 
@@ -129,7 +136,85 @@ let pressTimer;
 let wakeLock = null;
 
 // ============================================================
-// UTILIDADES Y COLORES
+// LÓGICA DE PÉTALOS (FLORES CAYENDO)
+// ============================================================
+class Petal {
+    constructor() {
+        this.reset();
+        this.y = Math.random() * particlesCanvas.height; 
+    }
+    reset() {
+        this.x = Math.random() * particlesCanvas.width;
+        this.y = -20;
+        this.size = Math.random() * 15 + 10; 
+        this.speedY = Math.random() * 1.5 + 0.5;
+        this.speedX = Math.random() * 1 - 0.5;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = Math.random() * 0.04 - 0.02;
+    }
+    update() {
+        this.y += this.speedY;
+        this.x += this.speedX;
+        this.rotation += this.rotSpeed;
+        this.x += Math.sin(this.y / 50) * 0.5;
+
+        if (this.y > particlesCanvas.height + 20) {
+            this.reset();
+        }
+    }
+    draw() {
+        if (!particlesCtx || !petalImg.complete) return;
+        particlesCtx.save();
+        particlesCtx.translate(this.x, this.y);
+        particlesCtx.rotate(this.rotation);
+        particlesCtx.drawImage(petalImg, -this.size / 2, -this.size / 2, this.size, this.size);
+        particlesCtx.restore();
+    }
+}
+
+function initParticles() {
+    if (!particlesCanvas || !particlesCtx) return;
+    particlesCanvas.width = window.innerWidth;
+    particlesCanvas.height = window.innerHeight;
+    
+    particles = [];
+    for (let i = 0; i < 30; i++) {
+        particles.push(new Petal());
+    }
+}
+
+window.addEventListener('resize', () => {
+    if (particlesCanvas) {
+        particlesCanvas.width = window.innerWidth;
+        particlesCanvas.height = window.innerHeight;
+    }
+    if (canvas) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+    }
+});
+
+// ============================================================
+// EVENTOS DE LOS SLIDERS (NITIDEZ Y TRANSPARENCIA)
+// ============================================================
+if (bgBlurSlider) {
+    bgBlurSlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        localStorage.setItem('ymPlay_bgBlur', val);
+        if (customBg) customBg.style.filter = `blur(${val}px)`;
+    });
+}
+
+if (uiOpacitySlider) {
+    uiOpacitySlider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        localStorage.setItem('ymPlay_uiOpacity', val);
+        document.documentElement.style.setProperty('--ui-transparency', val);
+    });
+}
+
+// ============================================================
+// COLORES Y UTILIDADES
 // ============================================================
 function resizeImage(file, maxWidth, callback) {
     const reader = new FileReader();
@@ -149,7 +234,6 @@ function resizeImage(file, maxWidth, callback) {
     reader.readAsDataURL(file);
 }
 
-// AQUI ESTÁ LA MAGIA DEL COLOR TIPO LARK PLAYER
 function extraerColorDominante(imageSrc, isCover = false) {
     if (!imageSrc) return;
     const img = new Image();
@@ -171,25 +255,20 @@ function extraerColorDominante(imageSrc, isCover = false) {
         if (count > 0) {
             r = Math.floor(r/count); g = Math.floor(g/count); b = Math.floor(b/count);
             
-            // 1. Color del Acento (el que brilla)
             const accentHex = `rgb(${r}, ${g}, ${b})`;
             document.documentElement.style.setProperty('--accent', accentHex);
             document.documentElement.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.4)`);
             document.documentElement.style.setProperty('--accent-gradient', `linear-gradient(135deg, rgb(${r},${g},${b}) 0%, rgba(${r},${g},${b},0.6) 100%)`);
 
-            // 2. Color de FONDO OSCURO (El efecto Lark Player)
-            // Multiplicamos por 0.15 para que sea muy oscuro y no lastime la vista
             const darkR = Math.floor(r * 0.15);
             const darkG = Math.floor(g * 0.15);
             const darkB = Math.floor(b * 0.15);
             const bgHex = `rgb(${darkR}, ${darkG}, ${darkB})`;
             
-            // Aplicamos a los menús y fondos
             document.documentElement.style.setProperty('--bg-body', bgHex);
             document.documentElement.style.setProperty('--bg-card', `rgba(${darkR}, ${darkG}, ${darkB}, 0.85)`);
             document.documentElement.style.setProperty('--bg-card-solid', `rgb(${Math.floor(darkR*0.9)}, ${Math.floor(darkG*0.9)}, ${Math.floor(darkB*0.9)})`);
 
-            // Si es portada, actualizamos los anillos también
             if (isCover) {
                 document.documentElement.style.setProperty('--cover-color', accentHex);
                 document.documentElement.style.setProperty('--cover-glow', `rgba(${r}, ${g}, ${b}, 0.6)`);
@@ -223,7 +302,7 @@ function initAudioContext() {
 }
 
 function drawVisualizer() {
-    if (!analyser || !canvasCtx) return;
+    if (!analyser) return;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     
@@ -232,16 +311,45 @@ function drawVisualizer() {
         analyser.getByteFrequencyData(dataArray);
         const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00d2ff';
 
-        if (canvas.width !== canvas.clientWidth) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
-        canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        const barWidth = (canvas.width / bufferLength) * 2.5;
-        let x = 0;
-        for (let i = 0; i < bufferLength; i++) {
-            const barHeight = (dataArray[i] / 255) * canvas.height;
-            canvasCtx.fillStyle = accentColor;
-            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-            x += barWidth + 1;
+        // DIBUJAR VISUALIZADOR DE ONDA
+        if (canvas && canvasCtx && canvas.clientWidth > 0) {
+            if (canvas.width !== canvas.clientWidth) { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            canvasCtx.beginPath();
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = accentColor;
+            
+            const sliceWidth = canvas.width * 1.0 / bufferLength;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0; 
+                const y = (canvas.height / 2) + ((v - 1) * (canvas.height / 2)) * 0.8;
+
+                if (i === 0) canvasCtx.moveTo(x, y);
+                else canvasCtx.lineTo(x, y);
+
+                x += sliceWidth;
+            }
+            canvasCtx.lineTo(canvas.width, canvas.height / 2);
+            canvasCtx.stroke();
+        }
+
+        // DIBUJAR PÉTALOS
+        if (particlesCtx && document.body.classList.contains('tiktok-mode')) {
+            particlesCtx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
+            
+            // MAGIA: Ignora el fondo de la imagen
+            particlesCtx.globalCompositeOperation = 'screen'; 
+            
+            particles.forEach(petal => {
+                petal.update();
+                petal.draw();
+            });
+            
+            // Restaurar modo normal
+            particlesCtx.globalCompositeOperation = 'source-over'; 
         }
     }
     draw();
@@ -283,7 +391,9 @@ if (bgInput) {
                     localStorage.setItem('ymPlay_customBg', base64);
                     customBg.style.backgroundImage = `url(${base64})`;
                     document.body.classList.add('has-custom-bg');
-                    extraerColorDominante(base64); // Cambia el color del menú aquí
+                    extraerColorDominante(base64); 
+                    const currentBlur = bgBlurSlider ? bgBlurSlider.value : 0;
+                    customBg.style.filter = `blur(${currentBlur}px)`;
                 } catch (err) { alert("Imagen demasiado grande, intenta con otra."); }
             });
         }
@@ -298,7 +408,7 @@ if (quickPlayerBgInput) {
                 try {
                     localStorage.setItem('ymPlay_playerBg', base64);
                     if(playerBg) { playerBg.style.backgroundImage = `url(${base64})`; playerBg.style.opacity = '1'; }
-                    extraerColorDominante(base64); // El fondo del reproductor también cambia el menú
+                    extraerColorDominante(base64); 
                 } catch (err) { alert("Imagen demasiado grande, intenta con otra."); }
             });
         }
@@ -321,7 +431,7 @@ if (coverInput) {
     });
 }
 
-// Letras (LRC)
+// Letras
 function parseLRC(lrcText) {
     const lines = lrcText.split('\n');
     const result = [];
@@ -392,6 +502,7 @@ if (btnTikTokMode) {
     btnTikTokMode.addEventListener('click', () => {
         document.body.classList.add('tiktok-mode');
         if(btnExitTikTok) btnExitTikTok.style.display = 'flex';
+        initParticles(); 
     });
 }
 
@@ -399,6 +510,7 @@ if (btnExitTikTok) {
     btnExitTikTok.addEventListener('click', () => {
         document.body.classList.remove('tiktok-mode');
         if(btnExitTikTok) btnExitTikTok.style.display = 'none';
+        if(particlesCtx) particlesCtx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
     });
 }
 
@@ -790,7 +902,6 @@ if($('btnAutoColor')) {
         } else if (currentIndex !== -1 && tracks[currentIndex] && tracks[currentIndex].cover) {
             extraerColorDominante(tracks[currentIndex].cover, true);
         } else {
-            // Colores por defecto
             document.documentElement.style.setProperty('--accent', "#00d2ff");
             document.documentElement.style.setProperty('--accent-glow', "rgba(0, 210, 255, 0.4)");
             document.documentElement.style.setProperty('--bg-body', '#0b0f19');
@@ -964,9 +1075,13 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPlaylists(); 
   loadCachedTracks();
   
-  const savedOpacity = localStorage.getItem('ymPlay_uiOpacity');
-  if (savedOpacity) { uiOpacitySlider.value = savedOpacity; document.documentElement.style.setProperty('--ui-transparency', savedOpacity); } 
-  else { uiOpacitySlider.value = 0.2; document.documentElement.style.setProperty('--ui-transparency', 0.2); }
+  const savedOpacity = localStorage.getItem('ymPlay_uiOpacity') || 0.2;
+  if (uiOpacitySlider) uiOpacitySlider.value = savedOpacity;
+  document.documentElement.style.setProperty('--ui-transparency', savedOpacity);
+
+  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0;
+  if (bgBlurSlider) bgBlurSlider.value = savedBlur;
+  if (customBg) customBg.style.filter = `blur(${savedBlur}px)`;
 
   const savedThemeColor = localStorage.getItem('ymPlay_manualTheme');
   if (savedThemeColor) {
@@ -979,13 +1094,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const savedBg = localStorage.getItem('ymPlay_customBg'); 
-  const savedBlur = localStorage.getItem('ymPlay_bgBlur') || 0; 
   if (savedBg) { 
-      if (bgBlurSlider) bgBlurSlider.value = savedBlur; 
       customBg.style.backgroundImage = `url(${savedBg})`;
       document.body.classList.add('has-custom-bg');
-      customBg.style.filter = `blur(${savedBlur}px)`;
-      extraerColorDominante(savedBg); // ESTO HACE QUE EL MENÚ CAMBIE AL COLOR DEL FONDO AL ABRIR
+      extraerColorDominante(savedBg); 
   }
   
   setTimeout(() => { escanearMusicaNativa(); }, 1000);
