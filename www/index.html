@@ -9,6 +9,8 @@
 <body>
 
   <div id="custom-bg"></div>
+  <!-- Lienzo para los pétalos cayendo -->
+  <canvas id="particlesCanvas" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:1; pointer-events:none; opacity:0; transition: opacity 0.5s;"></canvas>
 
   <!-- BANNER DE ACTUALIZACIÓN -->
   <div id="update-banner" class="update-banner">
@@ -165,6 +167,7 @@
           </div>
         </div>
 
+        <!-- DISEÑO DE CAJA AESTHETIC -->
         <div class="aesthetic-player">
           <div class="tiktok-borders top-left"></div>
           <div class="tiktok-borders top-right"></div>
@@ -173,8 +176,8 @@
           
           <div class="aesthetic-left">
             <div class="cover-wrapper">
-              <div class="decorative-ring ring-1"></div>
-              <div class="decorative-ring ring-2"></div>
+              <!-- El aro de imagen -->
+              <div class="image-ring"></div>
               <div class="cover-container" id="coverContainer">
                 <div class="cover-placeholder">♪</div>
                 <img id="coverImg" src="" alt="Portada" />
